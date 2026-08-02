@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лабиринт — 11 сложных уровней</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+
+    <!-- ГЛАВНОЕ МЕНЮ -->
+    <div id="menu-screen" class="screen">
+        <h1>🏰 Лабиринт с врагами</h1>
+        <button class="menu-btn" onclick="startGame()">🎮 Играть (случайный из 11)</button>
+        <button class="menu-btn" onclick="showLevelSelect()">🗺 Выбрать уровень</button>
+        <button class="menu-btn" onclick="showDifficulty()">⚙️ Уровни сложности</button>
+        <button class="menu-btn" onclick="showTutorial()">📖 Обучение</button>
+        <button class="menu-btn" onclick="showAdmin()">🔧 Админ-панель</button>
+    </div>
+
+    <!-- ВЫБОР УРОВНЯ -->
+    <div id="level-select-screen" class="screen hidden">
+        <h2>🗺 Выберите уровень (1–11)</h2>
+        <div class="level-select" id="levelButtons"></div>
+        <button class="back-btn" onclick="backToMenu()">← Назад</button>
+    </div>
+
+    <!-- СЛОЖНОСТЬ -->
+    <div id="difficulty-screen" class="screen hidden">
+        <h2>⚙️ Выберите сложность</h2>
+        <div style="display:flex; gap:15px; margin:10px 0;">
+            <div class="menu-btn" style="border-color:#4a4; width:100px;" onclick="setDifficulty('easy')">🟢 Лёгкий<div style="font-size:10px;color:#888;">2 врага, агр 4</div></div>
+            <div class="menu-btn" style="border-color:#fa0; width:100px;" onclick="setDifficulty('medium')">🟡 Средний<div style="font-size:10px;color:#888;">3 врага, агр 3, 🔑 ключи</div></div>
+            <div class="menu-btn" style="border-color:#f44; width:100px;" onclick="setDifficulty('hard')">🔴 Сложный<div style="font-size:10px;color:#888;">4 врага, агр 2, 🔑+🌫</div></div>
+        </div>
+        <button class="back-btn" onclick="backToMenu()">← Назад</button>
+    </div>
+
+    <!-- ОБУЧЕНИЕ -->
+    <div id="tutorial-screen" class="screen hidden">
+        <h2>📖 Как играть</h2>
+        <div style="max-width:400px;text-align:left;line-height:1.6;font-size:13px;color:#aaa;margin:10px 0;">
+            <p>🎯 <span style="color:#fa0;">Цель:</span> дойти до финиша <b>F</b>.</p>
+            <p>🎮 <span style="color:#fa0;">Управление:</span> Ц/Ф/Ы/В или WASD, или Стрелки</p>
+            <p>🗺 <span style="color:#fa0;">11 уровней:</span> каждый сложный и проходимый!</p>
+            <p>👀 <span style="color:#fa0;">Враги:</span> видят по прямой — бегут.</p>
+            <p>🔑 <span style="color:#fa0;">Ключи:</span> на среднем и сложном нужно собрать обе части, чтобы открыть финиш.</p>
+            <p>🌫 <span style="color:#fa0;">Туман войны:</span> на сложном карта скрыта, исследуйте её.</p>
+            <p>🔒 <span style="color:#fa0;">Финиш:</span> заблокирован при погоне.</p>
+            <p>⚔ <span style="color:#fa0;">Секретная комната (10%):</span> найдите трещину, возьмите меч и бейте врагов и босса клавишей <b>Пробел</b>.</p>
+        </div>
+        <button class="back-btn" onclick="backToMenu()">← Назад</button>
+    </div>
+
+    <!-- АДМИН-ПАНЕЛЬ -->
+    <div id="admin-screen" class="screen hidden">
+        <h2>🔧 Админ-панель</h2>
+        <div class="admin-panel">
+            <h3>Обычные враги</h3>
+            <div class="admin-row"><label>Кол-во:</label><input type="range" id="aEnemyCount" min="1" max="8" value="3" oninput="document.getElementById('aEnemyCountVal').textContent=this.value; updateEnemyDistribution();"><span class="value-display" id="aEnemyCountVal">3</span></div>
+
+            <h3>Стражи (треугольники)</h3>
+            <div class="admin-row"><label>Кол-во:</label><input type="range" id="aPatrolCount" min="0" max="4" value="2" oninput="document.getElementById('aPatrolCountVal').textContent=this.value; updateEnemyDistribution();"><span class="value-display" id="aPatrolCountVal">2</span></div>
+
+            <div class="admin-row">
+                <label>Распределение:</label>
+                <span style="color:#aaa;">
+                Обычных: <span id="aNormalCount" style="color:#f64;">1</span> |
+                Стражей: <span id="aPatrolCountDisplay" style="color:#80d;">2</span>
+            </span>
+            </div>
+
+            <h3>Настройки поведения</h3>
+            <div class="admin-row"><label>Агр (ходов):</label><input type="range" id="aAgro" min="1" max="10" value="3" oninput="document.getElementById('aAgroVal').textContent=this.value"><span class="value-display" id="aAgroVal">3</span></div>
+            <div class="admin-row"><label>Видимость:</label><input type="range" id="aVision" min="1" max="20" value="99" oninput="document.getElementById('aVisionVal').textContent=this.value>=99?'∞':this.value"><span class="value-display" id="aVisionVal">∞</span></div>
+
+            <h3>Особые режимы</h3>
+            <div class="admin-row"><label>Блокировка финиша:</label><select id="aFinishLock"><option value="yes">Да</option><option value="no">Нет</option></select></div>
+            <div class="admin-row"><label>Неуязвимость:</label><select id="aInvincible"><option value="no">Нет</option><option value="yes">Да</option></select></div>
+            <div class="admin-row"><label>Ключи (2 части):</label><select id="aKeys"><option value="yes">Да</option><option value="no">Нет</option></select></div>
+            <div class="admin-row"><label>Туман войны:</label><select id="aFog"><option value="no">Нет</option><option value="yes">Да</option></select></div>
+            <div class="admin-row"><label>Радиус тумана:</label><input type="range" id="aFogVision" min="1" max="10" value="4" oninput="document.getElementById('aFogVisionVal').textContent=this.value"><span class="value-display" id="aFogVisionVal">4</span></div>
+
+            <button class="apply-btn" onclick="applyAdmin()" style="margin-top:10px;">✅ Применить</button>
+        </div>
+        <button class="back-btn" onclick="backToMenu()">← Назад</button>
+    </div>
+
+    <!-- ИГРА -->
+    <div id="game-screen" class="screen hidden">
+        <h2 id="game-title">🏰 Лабиринт</h2>
+        <canvas id="game" width="450" height="450"></canvas>
+        <div class="info" id="playerHpDisplay" style="font-size:14px; font-weight:bold;"></div>
+        <div class="info" id="msg"></div>
+        <div class="legend">Ц/Ф/Ы/В или WASD, или Стрелки | 🔒 закрыт | 🔓 открыт | 🔑 ключ | 🗝 стена-проход (10%) | ⚔ взмах — Пробел | 👹 босс: 6 ударов мечом, атаки огнём 🔥 | Уровень <span id="levelNumDisplay"></span>/11</div>
+        <div style="display:flex; gap:8px; margin-top:4px;">
+            <button onclick="restartLevel()">🔁 Заново</button>
+            <button onclick="restartGame()">🔄 Другой уровень</button>
+            <button onclick="backToMenuFromGame()">← В меню</button>
+        </div>
+    </div>
+
+    <!-- ПАНЕЛЬ КОНЦА ИГРЫ -->
+    <div id="end-screen" class="screen hidden" style="position:fixed; inset:0; z-index:10; background:rgba(0,0,0,0.88); justify-content:center;">
+        <h1 id="end-title">🏆 ПОБЕДА!</h1>
+        <div class="info" id="end-subtitle" style="font-size:14px; margin-bottom:14px;"></div>
+        <button class="menu-btn" onclick="restartLevel()">🔁 Заново</button>
+        <button class="menu-btn" id="next-level-btn" onclick="nextLevel()">➡ Следующий уровень</button>
+        <button class="menu-btn" onclick="backToMenuFromGame()">← В меню</button>
+    </div>
+
+    <!-- Подключение файлов в правильном порядке -->
+    <script src="levels.js"></script>
+    <script src="navigation.js"></script>
+
+    <!-- Базовые классы -->
+    <script src="js/PathFinder.js"></script>
+
+    <!-- Конфигурации -->
+    <script src="js/PlayerConfig.js"></script>
+    <script src="js/EnemyConfig.js"></script>
+    <script src="js/FinishConfig.js"></script>
+    <script src="js/KeyConfig.js"></script>
+
+    <!-- Игровые объекты -->
+    <script src="js/Player.js"></script>
+    <script src="js/Enemy.js"></script>
+    <script src="js/PatrolEnemy.js"></script> <!-- Новый тип врага -->
+    <script src="js/BossEnemy.js"></script> <!-- Босс последнего уровня -->
+
+    <!-- Основные классы -->
+    <script src="js/Game.js"></script>
+    <script src="js/Renderer.js"></script>
+
+    <!-- Главный файл инициализации -->
+    <script src="script.js"></script>
+
+</body>
+</html>
