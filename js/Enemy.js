@@ -17,6 +17,7 @@ class Enemy {
         this.homeX = x;
         this.config = config;
         this.gameConfig = gameConfig;
+        this.type = 'enemy';     // Тип врага (patrol/boss переопределяют)
 
         // Состояния врага
         this.chase = false;      // Преследует игрока

@@ -527,10 +527,12 @@ class BossEnemy extends Enemy {
      * Удар мечом по боссу: HP -1, при 0 — повержен, иначе отброс блока
      * @returns {Object} {type, message}
      */
-    applySwordHit(player, maze, enemies, getRandomPassable) {
+    applySwordHit(player, maze, enemies, getRandomPassable, avoidPos) {
         if (this.defeated) return null;
 
-        this.hp--;
+        // Улучшенный меч из магазина наносит 2 урона за взмах
+        const dmg = (player && player.swordPlus) ? 2 : 1;
+        this.hp -= dmg;
         if (this.hp <= 0) {
             this.defeated = true;
             this.chase = false;
@@ -543,9 +545,9 @@ class BossEnemy extends Enemy {
         }
 
         // Переход во 2-ю стадию (ярость) на половине HP
-        if (this.hp === 3 && this.stage === 1) {
+        if (this.hp <= Math.floor(this.maxHp / 2) && this.stage === 1) {
             this.stage = 2;
-            const cell = this.getKnockbackCell(player, maze, enemies);
+            const cell = this.getKnockbackCell(player, maze, enemies, avoidPos);
             this.y = cell.y;
             this.x = cell.x;
             this.resetStateBlock(maze);
@@ -553,7 +555,7 @@ class BossEnemy extends Enemy {
         }
 
         // Отбрасываем блок не дальше 4 шагов (можно добить)
-        const cell = this.getKnockbackCell(player, maze, enemies);
+        const cell = this.getKnockbackCell(player, maze, enemies, avoidPos);
         this.y = cell.y;
         this.x = cell.x;
         this.resetStateBlock(maze);
@@ -561,17 +563,22 @@ class BossEnemy extends Enemy {
     }
 
     /**
-     * Случайная проходимая позиция блока 2x2 в радиусе 4 (для отброса после удара)
+     * Случайная проходимая позиция блока 2x2 в радиусе 4 (для отброса после удара).
+     * Не возвращается на место удара и не накрывает игрока/клетку avoidPos
+     * @param {Object} player - позиция игрока
+     * @param {Object} [avoidPos] - дополнительная клетка, которую блок не должен накрывать
      */
-    getKnockbackCell(player, maze, enemies) {
+    getKnockbackCell(player, maze, enemies, avoidPos) {
         const cells = [];
         for (let dy = -4; dy <= 4; dy++) {
             for (let dx = -4; dx <= 4; dx++) {
                 if (Math.abs(dy) + Math.abs(dx) > 4) continue;
+                if (dy === 0 && dx === 0) continue; // не оставаться на месте удара
                 const ny = this.y + dy;
                 const nx = this.x + dx;
                 if (!this.canPlace(ny, nx)) continue;
                 if (this.blockCovers(ny, nx, player.y, player.x)) continue;
+                if (avoidPos && this.blockCovers(ny, nx, avoidPos.y, avoidPos.x)) continue;
                 if (enemies.find(e => e !== this && e.y >= ny && e.y <= ny + 1 && e.x >= nx && e.x <= nx + 1)) continue;
                 cells.push({ y: ny, x: nx });
             }

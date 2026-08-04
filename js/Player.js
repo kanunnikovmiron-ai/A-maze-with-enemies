@@ -7,16 +7,17 @@ class Player {
      * @param {number} x - начальная координата X
      * @param {PlayerConfig} config - конфигурация игрока
      */
-    constructor(y, x, config) {
+    constructor(y, x, config, bossLevel) {
         this.y = y;
         this.x = x;
         this.prevY = y;
         this.prevX = x;
         this.config = config;
         this.hasSword = false;         // Меч из секретной комнаты (бессрочный)
+        this.swordPlus = false;        // Улучшенный меч из магазина (урон боссу 2)
         this.facing = { dy: 0, dx: 0 }; // Направление последнего успешного хода (для взмаха)
-        this.maxHp = 3;                // Максимальное здоровье игрока
-        this.hp = 3;                   // Текущее здоровье игрока
+        this.maxHp = bossLevel ? 3 : 1; // HP: на босс-уровне 3, на обычных — 1
+        this.hp = this.maxHp;          // Текущее здоровье игрока
         this.hurtThisTurn = false;     // Уже получил урон в этот ход (защита от двойного урона)
     }
 
@@ -79,10 +80,107 @@ class Player {
         const ny = this.y + dy;
         const nx = this.x + dx;
 
+        // Вход в комнату магазина через дверь-проход
+        if (!game.inShopRoom && !game.inSecretRoom && game.shop &&
+            ny === game.shop.entrance.y && nx === game.shop.entrance.x) {
+            return game.enterShopRoom();
+        }
+
         // Вход в секретную комнату через стену-проход
         if (!game.inSecretRoom && game.secret && !game.secret.used &&
             ny === game.secret.entrance.y && nx === game.secret.entrance.x) {
             return game.enterSecretRoom();
+        }
+
+        // Вход в арену секретного босса через розовую трещину
+        if (!game.inSecretBossRoom && !game.inSecretRoom && game.secretBoss &&
+            !game.secretBoss.defeated &&
+            ny === game.secretBoss.entrance.y && nx === game.secretBoss.entrance.x) {
+            return game.enterSecretBossRoom();
+        }
+
+        // Движение внутри комнаты магазина
+        if (game.inShopRoom) {
+            if (!PathFinder.isPassable(ny, nx, game.maze, game.rows, game.cols)) {
+                return false;
+            }
+            this.y = ny;
+            this.x = nx;
+            this.facing = { dy, dx };
+
+            // Выход-портал
+            if (ny === game.shop.entryPos.y && nx === game.shop.entryPos.x) {
+                game.exitShopRoom();
+            } else {
+                // Пьедестал с товаром — автопокупка
+                const ped = game.shop.pedestals.find(p => p.y === ny && p.x === nx);
+                if (ped) game.buyOnPedestal(ped.itemId);
+            }
+            return true;
+        }
+
+        // Движение внутри арены секретного босса
+        if (game.inSecretBossRoom) {
+            if (!PathFinder.isPassable(ny, nx, game.maze, game.rows, game.cols)) {
+                return false;
+            }
+
+            // Выход-портал через клетку входа (розовую трещину)
+            if (ny === game.secretBoss.entryPos.y && nx === game.secretBoss.entryPos.x) {
+                this.y = ny;
+                this.x = nx;
+                this.facing = { dy, dx };
+                game.exitSecretBossRoom();
+                return true;
+            }
+
+            // Столкновение с сердцем
+            const heart = game.enemies.find(e => e.type === 'secretBoss' && e.y === ny && e.x === nx);
+            if (heart && !heart.defeated) {
+                if (this.isInvincible()) {
+                    const cell = game.getRandomPassable([this, ...game.enemies.filter(e => e !== heart)]);
+                    heart.y = cell.y;
+                    heart.x = cell.x;
+                    heart.homeY = cell.y;
+                    heart.homeX = cell.x;
+                    heart.resetState(game.maze);
+                    game.message = '🛡 Сердце отброшено.';
+                    game.repelledThisTurn = true;
+                } else {
+                    const defeatMessage = '💀 ПОРАЖЕНИЕ! Розовое сердце коснулось вас!';
+                    if (this.takeDamage(game, defeatMessage)) {
+                        return false;
+                    }
+                    const cell = game.getRandomPassable([this, ...game.enemies.filter(e => e !== heart)]);
+                    heart.y = cell.y;
+                    heart.x = cell.x;
+                    heart.homeY = cell.y;
+                    heart.homeX = cell.x;
+                    heart.resetState(game.maze);
+                    game.repelledThisTurn = true;
+                }
+            }
+
+            this.y = ny;
+            this.x = nx;
+            this.facing = { dy, dx };
+
+            // Огонь бомбы: -1 HP
+            const fire = game.hazards.find(h => h.phase === 'fire' && h.y === ny && h.x === nx);
+            if (fire && !this.hurtThisTurn && this.takeDamage(game, '💀 ПОРАЖЕНИЕ! Бомба взорвалась!')) {
+                return true;
+            }
+
+            // Двигаем сердце (оно кидает бомбы)
+            game.updateEnemies();
+            if (game.gameOver) return true;
+
+            // Огонь, вспыхнувший под игроком в этот ход
+            const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
+            if (fireNow && !this.hurtThisTurn && this.takeDamage(game, '💀 ПОРАЖЕНИЕ! Бомба взорвалась!')) {
+                return true;
+            }
+            return true;
         }
 
         // Движение внутри секретной комнаты
@@ -121,7 +219,7 @@ class Player {
             if (this.isInvincible()) {
                 if (enemyThere.type === 'boss') {
                     // Неуязвимость - отбрасываем блок босса (дом босса сохраняется)
-                    const cell = enemyThere.getKnockbackCell(this, game.maze, game.enemies);
+                    const cell = enemyThere.getKnockbackCell(this, game.maze, game.enemies, { y: ny, x: nx });
                     enemyThere.y = cell.y;
                     enemyThere.x = cell.x;
                     enemyThere.resetStateBlock(game.maze);
@@ -147,7 +245,7 @@ class Player {
                 }
                 // Выжили: отбрасываем врага как при неуязвимости, но с уроном
                 if (enemyThere.type === 'boss') {
-                    const cell = enemyThere.getKnockbackCell(this, game.maze, game.enemies);
+                    const cell = enemyThere.getKnockbackCell(this, game.maze, game.enemies, { y: ny, x: nx });
                     enemyThere.y = cell.y;
                     enemyThere.x = cell.x;
                     enemyThere.resetStateBlock(game.maze);
@@ -186,6 +284,24 @@ class Player {
             game.pickedKeyThisTurn = true;
         }
 
+        // Подбираем пикапы редактора (меч, бафы), если игрок входит в их клетку
+        const pickupHere = (game.pickups || []).find(p => !p.collected && p.y === ny && p.x === nx);
+        if (pickupHere) {
+            pickupHere.collected = true;
+            if (pickupHere.type === 'sword') {
+                this.giveSword();
+                game.message = '⚔ Вы взяли меч! Теперь Пробел — взмах по врагам.';
+            } else if (pickupHere.type === 'buffHp') {
+                this.maxHp += 1;
+                this.hp = Math.min(this.maxHp, this.hp + 1);
+                game.message = `❤ +1 HP! (${this.hp}/${this.maxHp})`;
+            } else if (pickupHere.type === 'buffInv') {
+                this.config.invincible = true;
+                game.message = '🛡 Неуязвимость до конца уровня!';
+            }
+            game.pickedKeyThisTurn = true;
+        }
+
         // Перемещаем игрока
         this.y = ny;
         this.x = nx;
@@ -212,6 +328,8 @@ class Player {
         if (!game.gameOver && this.y === game.finish.y && this.x === game.finish.x) {
             game.gameOver = true;
             game.message = '🏆 ПОБЕДА!';
+            const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { levelClear: 15 };
+            game.grantCoins(R.levelClear);
         } else if (!game.gameOver && !game.repelledThisTurn && !game.pickedKeyThisTurn && !this.hurtThisTurn) {
             // Обновляем статусное сообщение (не затираем сообщение об уроне)
             game.updateStatusMessage();
@@ -241,18 +359,41 @@ class Player {
         // Босс: блок 2x2, перекрывающий клетку взмаха
         const boss = game.boss;
         if (boss && !boss.defeated && boss.blockCovers(boss.y, boss.x, ty, tx)) {
-            const res = boss.applySwordHit(this, game.maze, game.enemies, (ex) => game.getRandomPassable(ex));
+            const res = boss.applySwordHit(this, game.maze, game.enemies, (ex) => game.getRandomPassable(ex), { y: ty, x: tx });
             if (res) {
                 game.repelledThisTurn = true;
                 game.message = res.message;
-                if (res.type === 'bossDefeated') game.message = res.message;
+                if (res.type === 'bossDefeated') {
+                    game.message = res.message;
+                    const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { boss: 30 };
+                    game.grantCoins(R.boss);
+                }
             }
             game.updateEnemies();
             return res;
         }
 
-        // Обычный враг
-        const enemy = game.enemies.find(e => e.type !== 'boss' && e.y === ty && e.x === tx);
+        // Секретный босс — розовое сердце (1x1)
+        const secretBoss = game.enemies.find(e => e.type === 'secretBoss' && e.y === ty && e.x === tx);
+        if (secretBoss) {
+            const res = secretBoss.takeSwordHit(game);
+            if (res) {
+                game.repelledThisTurn = true;
+                game.message = res.message;
+            }
+            game.updateEnemies();
+            if (!game.gameOver) {
+                // Огонь бомбы, вспыхнувший под игроком в этот ход
+                const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
+                if (fireNow && !this.hurtThisTurn && this.takeDamage(game, '💀 ПОРАЖЕНИЕ! Бомба взорвалась!')) {
+                    return { type: 'bossDefeated', message: game.message };
+                }
+            }
+            return res;
+        }
+
+        // Обычный враг (сердце секретного босса обрабатывается выше)
+        const enemy = game.enemies.find(e => e.type !== 'boss' && e.type !== 'secretBoss' && e.y === ty && e.x === tx);
         if (enemy) {
             game.removeEnemy(enemy);
             game.message = `⚔ ${enemy.id} убит мечом!`;

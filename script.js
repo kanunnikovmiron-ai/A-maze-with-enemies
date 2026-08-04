@@ -13,6 +13,8 @@ function initGame() {
     if (currentGame) {
         currentGame.stopSecretMusic();
         currentGame.stopBossMusic();
+        currentGame.stopShopMusic();
+        currentGame.stopSecretBossMusic();
     }
     // Останавливаем музыку меню
     stopMenuMusic();
@@ -25,7 +27,7 @@ function initGame() {
  * Перезапуск игры со случайным уровнем
  */
 function restartGame() {
-    selectedLevel = Math.floor(Math.random() * LEVELS.length);
+    selectedLevel = Math.floor(Math.random() * getTotalLevels());
     initGame();
 }
 
@@ -40,12 +42,46 @@ function restartLevel() {
  * Переход к следующему уровню (или в меню после последнего)
  */
 function nextLevel() {
-    if (selectedLevel >= LEVELS.length - 1) {
+    if (selectedLevel >= getTotalLevels() - 1) {
+        stopGameMusic();
+        backToMenu();
+        return;
+    }
+    if (LEVELS[selectedLevel] && LEVELS[selectedLevel].tutorial) {
+        stopGameMusic();
         backToMenu();
         return;
     }
     selectedLevel++;
     initGame();
+}
+
+/**
+ * Остановить всю музыку текущей игры (перед выходом в меню)
+ */
+function stopGameMusic() {
+    if (currentGame) {
+        currentGame.stopSecretMusic();
+        currentGame.stopBossMusic();
+        currentGame.stopShopMusic();
+        currentGame.stopSecretBossMusic();
+    }
+}
+
+/**
+ * Запуск превью уровня из редактора (без сохранения в список)
+ * @param {Object} level - объект уровня
+ */
+function initPreviewLevel(level) {
+    if (currentGame) {
+        currentGame.stopSecretMusic();
+        currentGame.stopBossMusic();
+        currentGame.stopShopMusic();
+        currentGame.stopSecretBossMusic();
+    }
+    stopMenuMusic();
+    currentGame = new Game(-1, getSettings(), level);
+    currentGame.renderer.draw();
 }
 
 /**
@@ -167,4 +203,5 @@ document.addEventListener('touchend', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Игра "Лабиринт" загружена и готова к работе!');
     console.log('Управление: WASD, ЦФЫВ или стрелки');
+    if (typeof initTutorialGate === 'function') initTutorialGate();
 });

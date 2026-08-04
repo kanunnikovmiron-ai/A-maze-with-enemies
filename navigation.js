@@ -1,11 +1,22 @@
 // ==================== НАВИГАЦИЯ ====================
 
 /**
+ * Экранирование HTML-символов (имена уровней вставляются в разметку)
+ * @param {string} str - строка
+ * @returns {string} экранированная строка
+ */
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+/**
  * Показать определенный экран
  * @param {string} id - ID экрана для отображения
  */
 function showScreen(id) {
-    ['menu-screen','level-select-screen','difficulty-screen','tutorial-screen','admin-screen','game-screen','end-screen'].forEach(s => {
+    ['menu-screen','password-screen','level-select-screen','difficulty-screen','tutorial-screen','admin-screen','editor-screen','game-screen','end-screen'].forEach(s => {
         document.getElementById(s).classList.add('hidden');
     });
     document.getElementById(id).classList.remove('hidden');
@@ -51,10 +62,18 @@ function stopMenuMusic() {
 }
 
 /**
+ * Случайный индекс основного уровня (обучающий уровень исключён)
+ * @returns {number}
+ */
+function randomMainLevelIndex() {
+    return 1 + Math.floor(Math.random() * (getTotalLevels() - 1));
+}
+
+/**
  * Начать игру со случайным уровнем
  */
 function startGame() {
-    selectedLevel = Math.floor(Math.random() * LEVELS.length);
+    selectedLevel = randomMainLevelIndex();
     showScreen('game-screen');
     initGame();
 }
@@ -77,14 +96,99 @@ function showDifficulty() {
  * Показать экран обучения
  */
 function showTutorial() {
+    const back = document.getElementById('tutorial-back-btn');
+    if (back) back.style.display = '';
+    showScreen('tutorial-screen');
+}
+
+// Флаг прохождения обязательного обучения
+const TUTORIAL_FLAG = 'miron_tutorial_done';
+
+/**
+ * Пройдено ли обязательное обучение
+ * @returns {boolean}
+ */
+function isTutorialDone() {
+    return localStorage.getItem(TUTORIAL_FLAG) === '1';
+}
+
+/**
+ * Завершить обучение и сразу начать обучающий уровень
+ */
+function finishTutorial() {
+    localStorage.setItem(TUTORIAL_FLAG, '1');
+    selectedLevel = 0;
+    showScreen('game-screen');
+    initGame();
+}
+
+/**
+ * При первом запуске показать обязательное обучение вместо меню
+ */
+function initTutorialGate() {
+    if (isTutorialDone()) return;
+    const back = document.getElementById('tutorial-back-btn');
+    if (back) back.style.display = 'none';
     showScreen('tutorial-screen');
 }
 
 /**
- * Показать админ-панель
+ * Показать админ-панель (с запросом пароля)
  */
 function showAdmin() {
-    showScreen('admin-screen');
+    requestProtectedScreen('admin-screen');
+}
+
+/**
+ * Показать редактор уровней (с запросом пароля)
+ */
+function showEditor() {
+    requestProtectedScreen('editor-screen');
+}
+
+// Пароль доступа к админ-панели и редактору
+const ADMIN_PASSWORD = '31415lol';
+
+// Экран, который нужно открыть после успешного ввода пароля
+let pendingProtectedScreen = null;
+
+/**
+ * Запросить пароль перед открытием защищённого экрана
+ * @param {string} target - ID целевого экрана
+ */
+function requestProtectedScreen(target) {
+    pendingProtectedScreen = target;
+    const input = document.getElementById('password-input');
+    const msg = document.getElementById('password-message');
+    if (input) input.value = '';
+    if (msg) msg.textContent = '';
+    showScreen('password-screen');
+}
+
+/**
+ * Проверить введённый пароль и открыть защищённый экран
+ */
+function submitPassword() {
+    const input = document.getElementById('password-input');
+    const msg = document.getElementById('password-message');
+    const value = input ? input.value : '';
+    if (value === ADMIN_PASSWORD) {
+        const target = pendingProtectedScreen || 'menu-screen';
+        pendingProtectedScreen = null;
+        showScreen(target);
+        if (target === 'editor-screen' && typeof initEditorUI === 'function') initEditorUI();
+    } else {
+        if (msg) msg.textContent = '❌ Неверный пароль';
+        if (input) { input.value = ''; input.focus(); }
+    }
+}
+
+/**
+ * Отменить ввод пароля и вернуться в меню
+ */
+function cancelPassword() {
+    pendingProtectedScreen = null;
+    showScreen('menu-screen');
 }
 
 /**
@@ -101,18 +205,33 @@ function backToMenuFromGame() {
     if (currentGame) {
         currentGame.gameRunning = false;
         currentGame.stopBossMusic();
+        currentGame.stopShopMusic();
+        currentGame.stopSecretMusic();
+        currentGame.stopSecretBossMusic();
     }
     showScreen('menu-screen');
 }
 
 /**
- * Отобразить кнопки выбора уровня
+ * Отобразить кнопки выбора уровня (встроенные + пользовательские)
  */
 function renderLevelButtons() {
     const container = document.getElementById('levelButtons');
-    container.innerHTML = LEVELS.map((l, i) => `
-        <div class="level-num" onclick="selectLevel(${i})" title="${l.name}">${i+1}</div>
+    let html = LEVELS.map((l, i) => `
+        <div class="level-num${l.tutorial ? ' tutorial' : ''}" onclick="selectLevel(${i})" title="${escapeHtml(l.name)}">${l.tutorial ? '0' : i}</div>
     `).join('');
+
+    // Пользовательские уровни из редактора
+    CUSTOM_LEVELS.forEach((l, j) => {
+        const idx = LEVELS.length + j;
+        html += `
+        <div class="level-num custom" onclick="selectLevel(${idx})" title="${escapeHtml(l.name)}">
+            <span class="custom-label">${escapeHtml(l.name)}</span>
+            <span class="custom-del" onclick="event.stopPropagation(); removeCustomLevelAt(${j}); renderLevelButtons();">🗑</span>
+        </div>`;
+    });
+
+    container.innerHTML = html;
 }
 
 // Текущий выбранный уровень
