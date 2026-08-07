@@ -296,7 +296,7 @@ class Enemy {
      * @returns {string}
      */
     getCatchMessage() {
-        return `💀 ПОРАЖЕНИЕ! ${this.id} поймал вас!`;
+        return t('msg_enemy_catch', this.id);
     }
 
     /**
@@ -304,7 +304,7 @@ class Enemy {
      * @returns {string}
      */
     getRepelMessage() {
-        return '🛡 Враг отброшен.';
+        return t('msg_enemy_repel');
     }
 
     /**

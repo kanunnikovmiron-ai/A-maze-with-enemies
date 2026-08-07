@@ -240,7 +240,7 @@ class PatrolEnemy extends Enemy {
      * @returns {string}
      */
     getCatchMessage() {
-        return `💀 ПОРАЖЕНИЕ! Страж ${this.id} поймал вас!`;
+        return t('msg_patrol_catch', this.id);
     }
 
     /**
@@ -248,7 +248,7 @@ class PatrolEnemy extends Enemy {
      * @returns {string}
      */
     getRepelMessage() {
-        return '🛡 Страж отброшен.';
+        return t('msg_patrol_repel');
     }
 
     /**

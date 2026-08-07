@@ -69,9 +69,9 @@ function initEditorUI() {
 function buildEditorPalette() {
     const pal = document.getElementById('editor-palette');
     if (!pal) return;
-    pal.innerHTML = PLACEMENT_ORDER.map(t => {
-        const def = PLACEMENT_TYPES[t];
-        return `<div class="editor-tool" id="editor-tool-${t}" onclick="selectEditorTool('${t}')" title="${def.label}">${def.icon}<span class="tip">${def.label}</span></div>`;
+    pal.innerHTML = PLACEMENT_ORDER.map(tp => {
+        const label = getPlacementLabel(tp);
+        return `<div class="editor-tool" id="editor-tool-${tp}" onclick="selectEditorTool('${tp}')" title="${label}">${PLACEMENT_TYPES[tp].icon}<span class="tip">${label}</span></div>`;
     }).join('');
     selectEditorTool('wall');
 }
@@ -79,17 +79,17 @@ function buildEditorPalette() {
 /**
  * Выбор инструмента палитры
  */
-function selectEditorTool(t) {
-    if (!PLACEMENT_TYPES[t]) return;
-    editorState.tool = t;
+function selectEditorTool(toolType) {
+    if (!PLACEMENT_TYPES[toolType]) return;
+    editorState.tool = toolType;
     editorState.previewArena = false;
     document.querySelectorAll('.editor-tool').forEach(el => el.classList.remove('active'));
-    const el = document.getElementById('editor-tool-' + t);
+    const el = document.getElementById('editor-tool-' + toolType);
     if (el) el.classList.add('active');
-    if (t === 'secretBoss') {
-        setEditorMessage('💗 Кликните по проходимой клетке — сердце появится на карте. Можно несколько.');
-    } else if (t === 'secretBossArena') {
-        setEditorMessage('💥 Кликните по стене лабиринта — трещина ведёт на арену секретного босса.');
+    if (toolType === 'secretBoss') {
+        setEditorMessage(t('editor_click_heart'));
+    } else if (toolType === 'secretBossArena') {
+        setEditorMessage(t('editor_click_crack'));
     }
 }
 
@@ -339,12 +339,12 @@ function editorToggleArenaPreview() {
     if (editorState.previewArena && !editorState.secretBossEntrance) {
         editorState.previewArena = false;
         if (btn) btn.classList.remove('active');
-        setEditorMessage('❌ Сначала поставьте трещину 💗 на стену.');
+        setEditorMessage(t('editor_need_crack_wall'));
         drawEditor();
         return;
     }
     if (editorState.previewArena) {
-        setEditorMessage('💗 Превью арены: сердце босса по центру, портал-выход у входа.');
+        setEditorMessage(t('editor_arena_preview'));
     } else {
         setEditorMessage('');
     }
@@ -459,7 +459,7 @@ function editorNew() {
     editorState.secretBossEntrance = null;
     editorState.previewArena = false;
     const nameEl = document.getElementById('editor-name');
-    if (nameEl) nameEl.value = 'Мой уровень';
+    if (nameEl) nameEl.value = t('editor_name_default');
     setEditorMessage('');
     drawEditor();
 }
@@ -480,7 +480,7 @@ function editorSetSize(v) {
 function buildLevelFromEditor() {
     const placements = editorState.placements.map(p => ({ type: p.type, y: p.y, x: p.x }));
     const nameEl = document.getElementById('editor-name');
-    const name = (nameEl && nameEl.value.trim()) || 'Мой уровень';
+    const name = (nameEl && nameEl.value.trim()) || t('editor_name_default');
     const level = {
         name,
         maze: editorState.maze.map(row => row.slice()),
@@ -503,32 +503,32 @@ function validateEditorLevel() {
     const size = editorState.size;
     const maze = level.maze;
 
-    if (!level.start || !level.finish) return 'Задайте старт и финиш.';
-    if (!maze[level.start.y] || maze[level.start.y][level.start.x] !== 0) return 'Старт должен стоять на проходимой клетке.';
-    if (!maze[level.finish.y] || maze[level.finish.y][level.finish.x] !== 0) return 'Финиш должен стоять на проходимой клетке.';
-    if (level.start.y === level.finish.y && level.start.x === level.finish.x) return 'Старт и финиш не должны совпадать.';
+    if (!level.start || !level.finish) return t('editor_err_start_finish');
+    if (!maze[level.start.y] || maze[level.start.y][level.start.x] !== 0) return t('editor_err_start_passable');
+    if (!maze[level.finish.y] || maze[level.finish.y][level.finish.x] !== 0) return t('editor_err_finish_passable');
+    if (level.start.y === level.finish.y && level.start.x === level.finish.x) return t('editor_err_start_finish_same');
 
     const boss = level.placements.find(p => p.type === 'boss');
     if (boss) {
-        if (boss.y + 1 >= size || boss.x + 1 >= size) return 'Босс выходит за границы лабиринта.';
+        if (boss.y + 1 >= size || boss.x + 1 >= size) return t('editor_err_boss_bounds');
         for (const [dy, dx] of [[0,0],[0,1],[1,0],[1,1]]) {
-            if (maze[boss.y + dy][boss.x + dx] === 1) return 'Босс должен стоять на проходимом блоке 2×2.';
+            if (maze[boss.y + dy][boss.x + dx] === 1) return t('editor_err_boss_passable');
         }
         const hasSword = level.placements.some(p => p.type === 'sword');
-        if (!hasSword && !level.secretEntrance) return 'На босс-уровне нужен меч ⚔ или трещина 🗝 (чтобы победить босса).';
+        if (!hasSword && !level.secretEntrance) return t('editor_err_boss_need_sword');
     }
 
     if (level.secretEntrance) {
         const se = level.secretEntrance;
-        if (se.y <= 0 || se.y >= size - 1 || se.x <= 0 || se.x >= size - 1) return 'Трещина 🗝 должна быть на внутренней стене (не по краю).';
-        if (maze[se.y][se.x] !== 1) return 'Трещина 🗝 должна быть на стене.';
+        if (se.y <= 0 || se.y >= size - 1 || se.x <= 0 || se.x >= size - 1) return t('editor_err_crack_edge');
+        if (maze[se.y][se.x] !== 1) return t('editor_err_crack_wall');
     }
 
     if (level.secretBossEntrance) {
         const sbe = level.secretBossEntrance;
-        if (sbe.y <= 0 || sbe.y >= size - 1 || sbe.x <= 0 || sbe.x >= size - 1) return 'Трещина 💗 секретного босса должна быть на внутренней стене (не по краю).';
-        if (maze[sbe.y][sbe.x] !== 1) return 'Трещина 💗 секретного босса должна быть на стене.';
-        if (level.secretEntrance && level.secretEntrance.y === sbe.y && level.secretEntrance.x === sbe.x) return 'Трещины 🗝 и 💗 не должны совпадать.';
+        if (sbe.y <= 0 || sbe.y >= size - 1 || sbe.x <= 0 || sbe.x >= size - 1) return t('editor_err_sbe_edge');
+        if (maze[sbe.y][sbe.x] !== 1) return t('editor_err_sbe_wall');
+        if (level.secretEntrance && level.secretEntrance.y === sbe.y && level.secretEntrance.x === sbe.x) return t('editor_err_cracks_same');
         const reachable = Array.from({ length: size }, () => Array(size).fill(false));
         const q = [{ y: level.start.y, x: level.start.x }];
         reachable[level.start.y][level.start.x] = true;
@@ -545,16 +545,16 @@ function validateEditorLevel() {
                 q.push({ y: ny, x: nx });
             }
         }
-        if (!near) return 'Трещина 💗 секретного босса должна быть достижима со стороны прохода.';
+        if (!near) return t('editor_err_sbe_reachable');
     }
 
     if (level.placements.some(p => p.type === 'secretBoss')) {
         const hasSword = level.placements.some(p => p.type === 'sword');
-        if (!hasSword && !level.secretEntrance) return 'С сердечками 💗 нужен меч ⚔ или трещина 🗝 (чтобы победить босса).';
+        if (!hasSword && !level.secretEntrance) return t('editor_err_heart_need_sword');
     }
 
     const path = PathFinder.findPath(level.start, level.finish, maze, size, size);
-    if (!path) return 'Нет пути от старта до финиша!';
+    if (!path) return t('editor_err_no_path');
 
     return null;
 }
@@ -576,7 +576,7 @@ function editorSave() {
     const err = validateEditorLevel();
     if (err) { setEditorMessage('❌ ' + err); return; }
     addCustomLevel(buildLevelFromEditor());
-    setEditorMessage('✅ Уровень сохранён! Он в списке уровней.');
+    setEditorMessage(t('editor_saved'));
 }
 
 /**
@@ -589,13 +589,13 @@ function editorExport() {
     try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(json).then(
-                () => setEditorMessage('✅ JSON скопирован в буфер обмена'),
+                () => setEditorMessage(t('editor_json_copied')),
                 () => {}
             );
         }
     } catch (e) { /* буфер может быть недоступен */ }
     if (!(navigator.clipboard && navigator.clipboard.writeText)) {
-        setEditorMessage('✅ Экспорт: JSON в поле ниже.');
+        setEditorMessage(t('editor_json_export'));
     }
 }
 
@@ -606,9 +606,9 @@ function editorImport() {
     const ta = document.getElementById('editor-import');
     if (!ta) return;
     const level = importLevel(ta.value);
-    if (!level) { setEditorMessage('❌ Неверный JSON уровня.'); return; }
+    if (!level) { setEditorMessage(t('editor_json_invalid')); return; }
     loadLevelIntoEditor(level);
-    setEditorMessage('✅ Уровень импортирован.');
+    setEditorMessage(t('editor_imported'));
 }
 
 /**
@@ -630,7 +630,7 @@ function loadLevelIntoEditor(level) {
         : null;
     editorState.previewArena = false;
     const nameEl = document.getElementById('editor-name');
-    if (nameEl) nameEl.value = level.name || 'Мой уровень';
+    if (nameEl) nameEl.value = level.name || t('editor_name_default');
     drawEditor();
 }
 

@@ -3,110 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Лабиринт — 12 уровней</title>
+    <title data-i18n="html_title">Лабиринт — 12 карт</title>
     <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 <body>
 
+    <!-- Toast-уведомление ачивок -->
+    <div id="achievement-toast" class="achievement-toast"></div>
+
     <!-- ГЛАВНОЕ МЕНЮ -->
     <div id="menu-screen" class="screen">
-        <h1>🏰 Лабиринт с врагами</h1>
-        <button class="menu-btn" onclick="startGame()">🎮 Играть (случайный из 11)</button>
-        <button class="menu-btn" onclick="showLevelSelect()">🗺 Выбрать уровень</button>
-        <button class="menu-btn" onclick="showDifficulty()">⚙️ Уровни сложности</button>
-        <button class="menu-btn" onclick="showTutorial()">📖 Обучение</button>
-        <button class="menu-btn" onclick="showAdmin()">🔧 Админ-панель</button>
-        <button class="menu-btn" onclick="showEditor()">🛠 Редактор уровней</button>
+        <h1 data-i18n="menu_title">🏰 Лабиринт с врагами</h1>
+        <button class="menu-btn" onclick="startGame()" data-i18n="btn_play">🎮 Играть (продолжить с первого непройденного)</button>
+        <button class="menu-btn" onclick="showLevelSelect()" data-i18n="btn_levels">🗺 Выбрать уровень</button>
+        <button class="menu-btn" onclick="showDifficulty()" data-i18n="btn_difficulty">⚙️ Уровни сложности</button>
+        <button class="menu-btn" onclick="showTutorial()" data-i18n="btn_tutorial">📖 Обучение</button>
+        <button class="menu-btn" onclick="showAdmin()" data-i18n="btn_admin">🔧 Админ-панель</button>
+        <button class="menu-btn" onclick="showEditor()" data-i18n="btn_editor">🛠 Редактор карт</button>
+        <button class="menu-btn" onclick="showAchievements()" data-i18n="btn_achievements">🏆 Достижения</button>
+        <button class="menu-btn" onclick="showLangScreen()" data-i18n="btn_lang">🌐 Язык</button>
+        <button class="menu-btn" style="border-color:#f66;font-size:13px;" onclick="resetProgress()" data-i18n="btn_reset">🗑 Сбросить всё</button>
+    </div>
+
+    <!-- ВЫБОР ЯЗЫКА -->
+    <div id="lang-screen" class="screen hidden">
+        <h2 data-i18n="lang_title">🌐 Язык / Language</h2>
+        <div style="display:flex; gap:15px; margin:10px 0;">
+            <button class="menu-btn" style="width:140px;" onclick="setLang('ru')">🇷🇺 Русский</button>
+            <button class="menu-btn" style="width:140px;" onclick="setLang('en')">🇬🇧 English</button>
+        </div>
+        <button class="back-btn" onclick="backToMenu()" data-i18n="password_back">← Назад</button>
     </div>
 
     <!-- ВВОД ПАРОЛЯ -->
     <div id="password-screen" class="screen hidden">
-        <h2>🔒 Введите пароль</h2>
-        <input type="password" id="password-input" placeholder="Пароль" onkeydown="if(event.key==='Enter')submitPassword()">
+        <h2 data-i18n="password_title">🔒 Введите пароль</h2>
+        <input type="password" id="password-input" data-i18n-placeholder="password_placeholder" placeholder="Пароль" onkeydown="if(event.key==='Enter')submitPassword()">
         <div class="info" id="password-message"></div>
-        <button class="menu-btn" onclick="submitPassword()">Войти</button>
-        <button class="back-btn" onclick="cancelPassword()">← Назад</button>
+        <button class="menu-btn" onclick="submitPassword()" data-i18n="password_submit">Войти</button>
+        <button class="back-btn" onclick="cancelPassword()" data-i18n="password_back">← Назад</button>
     </div>
 
     <!-- ВЫБОР УРОВНЯ -->
     <div id="level-select-screen" class="screen hidden">
-        <h2>🗺 Выберите уровень (1–11)</h2>
+        <h2 data-i18n="level_select_title">🗺 Выберите уровень (1–11)</h2>
         <div class="level-select" id="levelButtons"></div>
-        <button class="back-btn" onclick="backToMenu()">← Назад</button>
+        <button class="back-btn" onclick="backToMenu()" data-i18n="password_back">← Назад</button>
     </div>
 
     <!-- СЛОЖНОСТЬ -->
     <div id="difficulty-screen" class="screen hidden">
-        <h2>⚙️ Выберите сложность</h2>
+        <h2 data-i18n="difficulty_title">⚙️ Выберите сложность</h2>
         <div style="display:flex; gap:15px; margin:10px 0;">
-            <div class="menu-btn" style="border-color:#4a4; width:100px;" onclick="setDifficulty('easy')">🟢 Лёгкий<div style="font-size:10px;color:#888;">2 врага, агр 4</div></div>
-            <div class="menu-btn" style="border-color:#fa0; width:100px;" onclick="setDifficulty('medium')">🟡 Средний<div style="font-size:10px;color:#888;">3 врага, агр 3, 🔑 ключи</div></div>
-            <div class="menu-btn" style="border-color:#f44; width:100px;" onclick="setDifficulty('hard')">🔴 Сложный<div style="font-size:10px;color:#888;">4 врага, агр 2, 🔑+🌫</div></div>
+            <div class="menu-btn" style="border-color:#4a4; width:100px;" onclick="setDifficulty('easy')"><span data-i18n="diff_easy">🟢 Лёгкий</span><div style="font-size:10px;color:#888;" data-i18n="diff_easy_desc">2 врага, агр 4</div></div>
+            <div class="menu-btn" style="border-color:#fa0; width:100px;" onclick="setDifficulty('medium')"><span data-i18n="diff_medium">🟡 Средний</span><div style="font-size:10px;color:#888;" data-i18n="diff_medium_desc">3 врага, агр 3, 🔑 ключи</div></div>
+            <div class="menu-btn" style="border-color:#f44; width:100px;" onclick="setDifficulty('hard')"><span data-i18n="diff_hard">🔴 Сложный</span><div style="font-size:10px;color:#888;" data-i18n="diff_hard_desc">4 врага, агр 2, 🔑+🌫</div></div>
         </div>
-        <button class="back-btn" onclick="backToMenu()">← Назад</button>
+        <button class="back-btn" onclick="backToMenu()" data-i18n="password_back">← Назад</button>
     </div>
 
     <!-- ОБУЧЕНИЕ -->
     <div id="tutorial-screen" class="screen hidden">
-        <h2>📖 Как играть</h2>
+        <h2 data-i18n="tutorial_title">📖 Как играть</h2>
         <div style="max-width:400px;text-align:left;line-height:1.6;font-size:13px;color:#aaa;margin:10px 0;">
-            <p>🎯 <span style="color:#fa0;">Цель:</span> дойти до финиша <b>F</b>.</p>
-            <p>🎮 <span style="color:#fa0;">Управление:</span> Ц/Ф/Ы/В или WASD, или Стрелки</p>
-            <p>🗺 <span style="color:#fa0;">12 уровней:</span> «0 · Обучение» для новичков + 11 сложных и проходимых!</p>
-            <p>0️⃣ <span style="color:#fa0;">Уровень «Обучение»:</span> соберите 🔑 ключи, найдите 🗝 трещину в стене, заберите ⚔ меч, победите 👾 врагов и дойдите до финиша.</p>
-            <p>👀 <span style="color:#fa0;">Враги:</span> видят по прямой — бегут.</p>
-            <p>🔑 <span style="color:#fa0;">Ключи:</span> на среднем и сложном нужно собрать обе части, чтобы открыть финиш.</p>
-            <p>🌫 <span style="color:#fa0;">Туман войны:</span> на сложном карта скрыта, исследуйте её.</p>
-            <p>🔒 <span style="color:#fa0;">Финиш:</span> заблокирован при погоне.</p>
-            <p>⚔ <span style="color:#fa0;">Секретная комната (10%):</span> найдите трещину, возьмите меч и бейте врагов и босса клавишей <b>Пробел</b>. На «Обучении» трещина есть всегда.</p>
+            <p>🎯 <span style="color:#fa0;" data-i18n="tutorial_goal">Цель:</span></p>
+            <p>🎮 <span style="color:#fa0;" data-i18n="tutorial_controls">Управление:</span></p>
+            <p>🗺 <span style="color:#fa0;" data-i18n="tutorial_maps">12 карт:</span></p>
+            <p>0️⃣ <span style="color:#fa0;" data-i18n="tutorial_level0">Уровень «Обучение»:</span></p>
+            <p>👀 <span style="color:#fa0;" data-i18n="tutorial_enemies">Враги:</span></p>
+            <p>🔑 <span style="color:#fa0;" data-i18n="tutorial_keys">Ключи:</span></p>
+            <p>🌫 <span style="color:#fa0;" data-i18n="tutorial_fog">Туман войны:</span></p>
+            <p>🔒 <span style="color:#fa0;" data-i18n="tutorial_finish">Финиш:</span></p>
+            <p>⚔ <span style="color:#fa0;" data-i18n="tutorial_secret">Секретная комната (10%):</span></p>
         </div>
-        <button class="menu-btn" onclick="finishTutorial()">Продолжить →</button>
-        <button class="back-btn" id="tutorial-back-btn" onclick="backToMenu()">← Назад</button>
+        <button class="menu-btn" onclick="finishTutorial()" data-i18n="tutorial_continue">Продолжить →</button>
+        <button class="back-btn" id="tutorial-back-btn" onclick="backToMenu()" data-i18n="tutorial_back">← Назад</button>
     </div>
 
     <!-- АДМИН-ПАНЕЛЬ -->
     <div id="admin-screen" class="screen hidden">
-        <h2>🔧 Админ-панель</h2>
+        <h2 data-i18n="admin_title">🔧 Админ-панель</h2>
         <div class="admin-panel">
-            <h3>Обычные враги</h3>
-            <div class="admin-row"><label>Кол-во:</label><input type="range" id="aEnemyCount" min="1" max="8" value="3" oninput="document.getElementById('aEnemyCountVal').textContent=this.value; updateEnemyDistribution();"><span class="value-display" id="aEnemyCountVal">3</span></div>
+            <h3 data-i18n="admin_normal_enemies">Обычные враги</h3>
+            <div class="admin-row"><label data-i18n="admin_count">Кол-во:</label><input type="range" id="aEnemyCount" min="1" max="8" value="3" oninput="document.getElementById('aEnemyCountVal').textContent=this.value; updateEnemyDistribution();"><span class="value-display" id="aEnemyCountVal">3</span></div>
 
-            <h3>Стражи (треугольники)</h3>
-            <div class="admin-row"><label>Кол-во:</label><input type="range" id="aPatrolCount" min="0" max="4" value="2" oninput="document.getElementById('aPatrolCountVal').textContent=this.value; updateEnemyDistribution();"><span class="value-display" id="aPatrolCountVal">2</span></div>
+            <h3 data-i18n="admin_patrol">Стражи (треугольники)</h3>
+            <div class="admin-row"><label data-i18n="admin_count">Кол-во:</label><input type="range" id="aPatrolCount" min="0" max="4" value="2" oninput="document.getElementById('aPatrolCountVal').textContent=this.value; updateEnemyDistribution();"><span class="value-display" id="aPatrolCountVal">2</span></div>
 
             <div class="admin-row">
-                <label>Распределение:</label>
+                <label data-i18n="admin_distribution">Распределение:</label>
                 <span style="color:#aaa;">
-                Обычных: <span id="aNormalCount" style="color:#f64;">1</span> |
-                Стражей: <span id="aPatrolCountDisplay" style="color:#80d;">2</span>
+                <span data-i18n="admin_normal">Обычных:</span> <span id="aNormalCount" style="color:#f64;">1</span> |
+                <span data-i18n="admin_patrol_label">Стражей:</span> <span id="aPatrolCountDisplay" style="color:#80d;">2</span>
             </span>
             </div>
 
-            <h3>Настройки поведения</h3>
-            <div class="admin-row"><label>Агр (ходов):</label><input type="range" id="aAgro" min="1" max="10" value="3" oninput="document.getElementById('aAgroVal').textContent=this.value"><span class="value-display" id="aAgroVal">3</span></div>
-            <div class="admin-row"><label>Видимость:</label><input type="range" id="aVision" min="1" max="20" value="99" oninput="document.getElementById('aVisionVal').textContent=this.value>=99?'∞':this.value"><span class="value-display" id="aVisionVal">∞</span></div>
+            <h3 data-i18n="admin_behavior">Настройки поведения</h3>
+            <div class="admin-row"><label data-i18n="admin_agro">Агр (ходов):</label><input type="range" id="aAgro" min="1" max="10" value="3" oninput="document.getElementById('aAgroVal').textContent=this.value"><span class="value-display" id="aAgroVal">3</span></div>
+            <div class="admin-row"><label data-i18n="admin_vision">Видимость:</label><input type="range" id="aVision" min="1" max="20" value="99" oninput="document.getElementById('aVisionVal').textContent=this.value>=99?'∞':this.value"><span class="value-display" id="aVisionVal">∞</span></div>
 
-            <h3>Особые режимы</h3>
-            <div class="admin-row"><label>Блокировка финиша:</label><select id="aFinishLock"><option value="yes">Да</option><option value="no">Нет</option></select></div>
-            <div class="admin-row"><label>Неуязвимость:</label><select id="aInvincible"><option value="no">Нет</option><option value="yes">Да</option></select></div>
-            <div class="admin-row"><label>Ключи (2 части):</label><select id="aKeys"><option value="yes">Да</option><option value="no">Нет</option></select></div>
-            <div class="admin-row"><label>Туман войны:</label><select id="aFog"><option value="no">Нет</option><option value="yes">Да</option></select></div>
-            <div class="admin-row"><label>Радиус тумана:</label><input type="range" id="aFogVision" min="1" max="10" value="4" oninput="document.getElementById('aFogVisionVal').textContent=this.value"><span class="value-display" id="aFogVisionVal">4</span></div>
+            <h3 data-i18n="admin_special">Особые режимы</h3>
+            <div class="admin-row"><label data-i18n="admin_finish_lock">Блокировка финиша:</label><select id="aFinishLock"><option value="yes" data-i18n="admin_yes">Да</option><option value="no" data-i18n="admin_no">Нет</option></select></div>
+            <div class="admin-row"><label data-i18n="admin_invincible">Неуязвимость:</label><select id="aInvincible"><option value="no" data-i18n="admin_no">Нет</option><option value="yes" data-i18n="admin_yes">Да</option></select></div>
+            <div class="admin-row"><label data-i18n="admin_keys">Ключи (2 части):</label><select id="aKeys"><option value="yes" data-i18n="admin_yes">Да</option><option value="no" data-i18n="admin_no">Нет</option></select></div>
+            <div class="admin-row"><label data-i18n="admin_fog">Туман войны:</label><select id="aFog"><option value="no" data-i18n="admin_no">Нет</option><option value="yes" data-i18n="admin_yes">Да</option></select></div>
+            <div class="admin-row"><label data-i18n="admin_fog_radius">Радиус тумана:</label><input type="range" id="aFogVision" min="1" max="10" value="4" oninput="document.getElementById('aFogVisionVal').textContent=this.value"><span class="value-display" id="aFogVisionVal">4</span></div>
 
-            <button class="apply-btn" onclick="applyAdmin()" style="margin-top:10px;">✅ Применить</button>
+            <button class="apply-btn" onclick="applyAdmin()" style="margin-top:10px;" data-i18n="admin_apply">✅ Применить</button>
         </div>
-        <button class="back-btn" onclick="backToMenu()">← Назад</button>
+        <button class="back-btn" onclick="backToMenu()" data-i18n="password_back">← Назад</button>
     </div>
 
     <!-- РЕДАКТОР УРОВНЕЙ -->
     <div id="editor-screen" class="screen hidden">
-        <h2>🛠 Редактор уровней</h2>
+        <h2 data-i18n="editor_title">🛠 Редактор карт</h2>
         <div class="editor-layout">
             <div class="editor-left">
                 <div class="editor-toolbar" id="editor-palette"></div>
                 <div class="editor-actions">
-                    <label class="editor-field">Название: <input id="editor-name" type="text" value="Мой уровень" maxlength="30"></label>
-                    <label class="editor-field">Размер:
+                    <label class="editor-field"><span data-i18n="editor_name">Название:</span> <input id="editor-name" type="text" value="Мой уровень" maxlength="30"></label>
+                    <label class="editor-field"><span data-i18n="editor_size">Размер:</span>
                         <select id="editor-size" onchange="editorSetSize(this.value)">
                             <option value="15">15×15</option>
                             <option value="20">20×20</option>
@@ -114,16 +130,16 @@
                     </label>
                 </div>
                 <div class="editor-buttons">
-                    <button onclick="editorTest()">▶ Тест</button>
-                    <button onclick="editorSave()">💾 Сохранить</button>
-                    <button onclick="editorExport()">📋 Экспорт</button>
-                    <button onclick="editorImport()">📥 Импорт</button>
-                    <button id="editor-preview-arena" onclick="editorToggleArenaPreview()">💗 Превью арены</button>
-                    <button onclick="editorNew()">🆕 Новый</button>
-                    <button onclick="backToMenu()">↩ В меню</button>
+                    <button onclick="editorTest()" data-i18n="editor_test">▶ Тест</button>
+                    <button onclick="editorSave()" data-i18n="editor_save">💾 Сохранить</button>
+                    <button onclick="editorExport()" data-i18n="editor_export">📋 Экспорт</button>
+                    <button onclick="editorImport()" data-i18n="editor_import_btn">📥 Импорт</button>
+                    <button id="editor-preview-arena" onclick="editorToggleArenaPreview()" data-i18n="editor_preview">💗 Превью арены</button>
+                    <button onclick="editorNew()" data-i18n="editor_new">🆕 Новый</button>
+                    <button onclick="backToMenu()" data-i18n="editor_menu">↩ В меню</button>
                 </div>
                 <div class="info" id="editor-message"></div>
-                <textarea id="editor-import" placeholder="Сюда вставьте JSON уровня для импорта"></textarea>
+                <textarea id="editor-import" data-i18n-placeholder="editor_import_placeholder" placeholder="Сюда вставьте JSON карты для импорта"></textarea>
             </div>
             <canvas id="editor-canvas" width="450" height="450"></canvas>
         </div>
@@ -131,30 +147,51 @@
 
     <!-- ИГРА -->
     <div id="game-screen" class="screen hidden">
-        <h2 id="game-title">🏰 Лабиринт</h2>
+        <h2 id="game-title" data-i18n="game_title">🏰 Лабиринт</h2>
+        <div class="info" id="msg"></div>
         <canvas id="game" width="450" height="450"></canvas>
         <div class="info" id="playerHpDisplay" style="font-size:14px; font-weight:bold;"></div>
         <div class="info" id="walletDisplay" style="font-size:14px;">🪙 0</div>
-        <div class="info" id="msg"></div>
-        <div class="legend">Ц/Ф/Ы/В или WASD, или Стрелки | 🔒 закрыт | 🔓 открыт | 🔑 ключ | 🗝 стена-проход (10%) | ⚔ взмах — Пробел | 👹 босс: 6 ударов мечом, атаки огнём 🔥 | Уровень <span id="levelNumDisplay"></span>/11</div>
+        <div class="legend" id="game-legend"></div>
         <div style="display:flex; gap:8px; margin-top:4px;">
-            <button onclick="restartLevel()">🔁 Заново</button>
-            <button onclick="restartGame()">🔄 Другой уровень</button>
-            <button onclick="backToMenuFromGame()">← В меню</button>
+            <button onclick="restartLevel()" data-i18n="game_restart">🔁 Заново</button>
+            <button onclick="restartGame()" data-i18n="game_other_level">🔄 Другой уровень</button>
+            <button onclick="backToMenuFromGame()" data-i18n="game_to_menu">← В меню</button>
         </div>
+    </div>
+
+    <!-- ДОСТИЖЕНИЯ -->
+    <div id="achievements-screen" class="screen hidden">
+        <h2 data-i18n="achievements_title">🏆 Достижения</h2>
+        <div id="achievements-grid"></div>
+        <button class="back-btn" onclick="backToMenu()" data-i18n="password_back">← Назад</button>
     </div>
 
     <!-- ПАНЕЛЬ КОНЦА ИГРЫ -->
     <div id="end-screen" class="screen hidden" style="position:fixed; inset:0; z-index:10; background:rgba(0,0,0,0.88); justify-content:center;">
         <h1 id="end-title">🏆 ПОБЕДА!</h1>
         <div class="info" id="end-subtitle" style="font-size:14px; margin-bottom:14px;"></div>
-        <button class="menu-btn" onclick="restartLevel()">🔁 Заново</button>
-        <button class="menu-btn" id="next-level-btn" onclick="nextLevel()">➡ Следующий уровень</button>
-        <button class="menu-btn" onclick="backToMenuFromGame()">← В меню</button>
+        <button class="menu-btn" onclick="restartLevel()" data-i18n="game_restart">🔁 Заново</button>
+        <button class="menu-btn" id="next-level-btn" onclick="nextLevel()" data-i18n="end_next">➡ Следующий уровень</button>
+        <button class="menu-btn" onclick="backToMenuFromGame()" data-i18n="game_to_menu">← В меню</button>
+    </div>
+
+    <!-- ПАНЕЛЬ ПОДТВЕРЖДЕНИЯ ПОКУПКИ В МАГАЗИНЕ -->
+    <div id="shop-confirm" class="screen hidden" style="position:fixed; inset:0; z-index:15; background:rgba(0,0,0,0.85); justify-content:center; align-items:center;">
+        <div style="background:#1a1a2e; border:2px solid #fa0; border-radius:12px; padding:24px 32px; text-align:center; max-width:320px;">
+            <div id="shop-confirm-icon" style="font-size:36px; margin-bottom:8px;"></div>
+            <div id="shop-confirm-name" style="font-size:18px; font-weight:bold; color:#fff; margin-bottom:6px;"></div>
+            <div id="shop-confirm-price" style="font-size:14px; color:#fa0; margin-bottom:4px;"></div>
+            <div id="shop-confirm-coins" style="font-size:13px; color:#aaa; margin-bottom:16px;"></div>
+            <button class="menu-btn" onclick="shopConfirmBuy()" data-i18n="shop_confirm_buy">Купить</button>
+            <button class="menu-btn" onclick="shopConfirmCancel()" data-i18n="shop_confirm_cancel">Отмена</button>
+        </div>
     </div>
 
     <!-- Подключение файлов в правильном порядке -->
+    <script src="i18n.js"></script>
     <script src="levels.js"></script>
+    <script src="achievements.js"></script>
     <script src="navigation.js"></script>
     <script src="shop.js"></script>
     <script src="customLevels.js"></script>

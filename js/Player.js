@@ -15,6 +15,8 @@ class Player {
         this.config = config;
         this.hasSword = false;         // Меч из секретной комнаты (бессрочный)
         this.swordPlus = false;        // Улучшенный меч из магазина (урон боссу 2)
+        this.hasBow = false;           // Лук из магазина/секретки (дальнее оружие)
+        this.bowCooldown = 0;          // Кулдаун выстрела (0 = можно стрелять)
         this.facing = { dy: 0, dx: 0 }; // Направление последнего успешного хода (для взмаха)
         this.maxHp = bossLevel ? 3 : 1; // HP: на босс-уровне 3, на обычных — 1
         this.hp = this.maxHp;          // Текущее здоровье игрока
@@ -32,12 +34,13 @@ class Player {
         if (this.isInvincible()) return false;
         this.hp--;
         this.hurtThisTurn = true;
+        game.levelHits = (game.levelHits || 0) + 1;
         if (this.hp <= 0) {
             game.gameOver = true;
             game.message = defeatMessage;
             return true;
         }
-        game.message = `💔 Вы ранены! Осталось HP: ${this.hp}/${this.maxHp}`;
+        game.message = t('msg_hurt', this.hp, this.maxHp);
         return false;
     }
 
@@ -57,6 +60,13 @@ class Player {
     }
 
     /**
+     * Выдать игроку лук (подбор или покупка)
+     */
+    giveBow() {
+        this.hasBow = true;
+    }
+
+    /**
      * Попытка перемещения игрока
      * @param {number} dy - смещение по Y
      * @param {number} dx - смещение по X
@@ -65,11 +75,14 @@ class Player {
      */
     move(dy, dx, game) {
         if (game.gameOver) return false;
+        if (game.shopConfirmPending) return false;
 
         // Сбрасываем флаги отбрасывания врага и подбора ключа на этот ход
         game.repelledThisTurn = false;
         game.pickedKeyThisTurn = false;
         this.hurtThisTurn = false;
+        game.moves = (game.moves || 0) + 1;
+        if (this.bowCooldown > 0) this.bowCooldown--;
         // Анимация взмаха исчезает при следующем действии
         game.swingFlash = null;
 
@@ -81,19 +94,19 @@ class Player {
         const nx = this.x + dx;
 
         // Вход в комнату магазина через дверь-проход
-        if (!game.inShopRoom && !game.inSecretRoom && game.shop &&
+        if (!game.inShopRoom && !game.inSecretRoom && !game.inSecretBossRoom && game.shop &&
             ny === game.shop.entrance.y && nx === game.shop.entrance.x) {
             return game.enterShopRoom();
         }
 
         // Вход в секретную комнату через стену-проход
-        if (!game.inSecretRoom && game.secret && !game.secret.used &&
+        if (!game.inSecretRoom && !game.inShopRoom && !game.inSecretBossRoom && game.secret && !game.secret.used &&
             ny === game.secret.entrance.y && nx === game.secret.entrance.x) {
             return game.enterSecretRoom();
         }
 
         // Вход в арену секретного босса через розовую трещину
-        if (!game.inSecretBossRoom && !game.inSecretRoom && game.secretBoss &&
+        if (!game.inSecretBossRoom && !game.inSecretRoom && !game.inShopRoom && game.secretBoss &&
             !game.secretBoss.defeated &&
             ny === game.secretBoss.entrance.y && nx === game.secretBoss.entrance.x) {
             return game.enterSecretBossRoom();
@@ -112,9 +125,9 @@ class Player {
             if (ny === game.shop.entryPos.y && nx === game.shop.entryPos.x) {
                 game.exitShopRoom();
             } else {
-                // Пьедестал с товаром — автопокупка
+                // Пьедестал с товаром — подтверждение покупки
                 const ped = game.shop.pedestals.find(p => p.y === ny && p.x === nx);
-                if (ped) game.buyOnPedestal(ped.itemId);
+                if (ped) game.showShopConfirm(ped.itemId);
             }
             return true;
         }
@@ -144,10 +157,10 @@ class Player {
                     heart.homeY = cell.y;
                     heart.homeX = cell.x;
                     heart.resetState(game.maze);
-                    game.message = '🛡 Сердце отброшено.';
+                    game.message = t('msg_heart_repelled');
                     game.repelledThisTurn = true;
                 } else {
-                    const defeatMessage = '💀 ПОРАЖЕНИЕ! Розовое сердце коснулось вас!';
+                    const defeatMessage = t('msg_defeat_heart');
                     if (this.takeDamage(game, defeatMessage)) {
                         return false;
                     }
@@ -167,7 +180,7 @@ class Player {
 
             // Огонь бомбы: -1 HP
             const fire = game.hazards.find(h => h.phase === 'fire' && h.y === ny && h.x === nx);
-            if (fire && !this.hurtThisTurn && this.takeDamage(game, '💀 ПОРАЖЕНИЕ! Бомба взорвалась!')) {
+            if (fire && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_bomb'))) {
                 return true;
             }
 
@@ -177,7 +190,7 @@ class Player {
 
             // Огонь, вспыхнувший под игроком в этот ход
             const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
-            if (fireNow && !this.hurtThisTurn && this.takeDamage(game, '💀 ПОРАЖЕНИЕ! Бомба взорвалась!')) {
+            if (fireNow && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_bomb'))) {
                 return true;
             }
             return true;
@@ -209,6 +222,13 @@ class Player {
             return false;
         }
 
+        // Диагональное движение: запрет рубки углов (нужен хотя бы один смежный проход)
+        if (dy !== 0 && dx !== 0) {
+            const hOk = PathFinder.isPassable(this.y, nx, game.maze, game.rows, game.cols);
+            const vOk = PathFinder.isPassable(ny, this.x, game.maze, game.rows, game.cols);
+            if (!hOk && !vOk) return false;
+        }
+
         // Проверяем столкновение с врагом (босс занимает блок 2x2)
         const enemyThere = game.enemies.find(e =>
             e.type === 'boss'
@@ -223,7 +243,7 @@ class Player {
                     enemyThere.y = cell.y;
                     enemyThere.x = cell.x;
                     enemyThere.resetStateBlock(game.maze);
-                    game.message = '🛡 Босс отброшен.';
+                    game.message = t('msg_boss_repelled');
                 } else {
                     // Неуязвимость - отбрасываем врага
                     const cell = game.getRandomPassable([this, ...game.enemies.filter(e => e !== enemyThere)]);
@@ -232,14 +252,14 @@ class Player {
                     enemyThere.homeY = cell.y;
                     enemyThere.homeX = cell.x;
                     enemyThere.resetState(game.maze);
-                    game.message = '🛡 Враг отброшен.';
+                    game.message = t('msg_enemy_repelled');
                 }
                 game.repelledThisTurn = true;
             } else {
                 // Первое касание: -1 HP и отброс врага, второе касание — поражение
                 const defeatMessage = enemyThere.type === 'boss'
-                    ? '💀 ПОРАЖЕНИЕ! Босс 👹 поймал вас!'
-                    : `💀 ПОРАЖЕНИЕ! Вы наткнулись на ${enemyThere.id}!`;
+                    ? t('msg_defeat_boss_touch')
+                    : t('msg_defeat_enemy_touch', enemyThere.id);
                 if (this.takeDamage(game, defeatMessage)) {
                     return false;
                 }
@@ -261,27 +281,27 @@ class Player {
             }
         }
 
-        // Проверяем финиш
-        if (ny === game.finish.y && nx === game.finish.x) {
-            if (game.isFinishLocked()) {
-                if (game.boss && !game.boss.defeated) {
-                    game.message = '👹 Сначала победите босса!';
-                } else if (game.keyConfig.enabled && !game.hasAllKeys()) {
-                    game.message = `🔑 Нужны обе части ключа (${game.keysCollected}/${game.keys.length})!`;
-                } else {
-                    game.message = '🔒 Финиш заблокирован!';
-                }
-                return false;
-            }
-        }
-
         // Подбираем часть ключа, если игрок входит в её клетку
         const keyHere = game.keys.find(k => !k.collected && k.y === ny && k.x === nx);
         if (keyHere) {
             keyHere.collected = true;
             game.keysCollected++;
-            game.message = `🔑 Часть ключа найдена (${game.keysCollected}/${game.keys.length})!`;
+            game.message = t('msg_key_found', game.keysCollected, game.keys.length);
             game.pickedKeyThisTurn = true;
+        }
+
+        // Проверяем финиш
+        if (ny === game.finish.y && nx === game.finish.x) {
+            if (game.isFinishLocked()) {
+                if (game.boss && !game.boss.defeated) {
+                    game.message = t('msg_defeat_boss_first');
+                } else if (game.keyConfig.enabled && !game.hasAllKeys()) {
+                    game.message = t('msg_need_both_keys', game.keysCollected, game.keys.length);
+                } else {
+                    game.message = t('msg_finish_blocked');
+                }
+                return false;
+            }
         }
 
         // Подбираем пикапы редактора (меч, бафы), если игрок входит в их клетку
@@ -290,14 +310,17 @@ class Player {
             pickupHere.collected = true;
             if (pickupHere.type === 'sword') {
                 this.giveSword();
-                game.message = '⚔ Вы взяли меч! Теперь Пробел — взмах по врагам.';
+                game.message = t('msg_got_sword_pickup');
             } else if (pickupHere.type === 'buffHp') {
                 this.maxHp += 1;
                 this.hp = Math.min(this.maxHp, this.hp + 1);
-                game.message = `❤ +1 HP! (${this.hp}/${this.maxHp})`;
+                game.message = t('msg_hp_bonus', this.hp, this.maxHp);
             } else if (pickupHere.type === 'buffInv') {
                 this.config.invincible = true;
-                game.message = '🛡 Неуязвимость до конца уровня!';
+                game.message = t('msg_got_invincible');
+            } else if (pickupHere.type === 'bow') {
+                this.giveBow();
+                game.message = t('msg_got_bow');
             }
             game.pickedKeyThisTurn = true;
         }
@@ -307,9 +330,31 @@ class Player {
         this.x = nx;
         this.facing = { dy, dx };
 
+        // Проверяем победу (сразу после хода, до хода врагов — чтобы враги не убили на финише)
+        if (!game.gameOver && this.y === game.finish.y && this.x === game.finish.x) {
+            game.gameOver = true;
+            game.message = t('msg_victory');
+            game.markLevelCompleted();
+            const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { levelClear: 10 };
+            game.grantCoins(R.levelClear);
+            // Ачивки: завершение уровня
+            if (typeof updateStat === 'function') {
+                updateStat('levelsCompleted', (getStats().levelsCompleted || 0) + 1);
+                if (typeof checkLevelAchievements === 'function') {
+                    checkLevelAchievements({
+                        noDamage: !game.levelHits,
+                        fullHp: this.hp === this.maxHp,
+                        moves: game.moves || 0,
+                        levelIndex: game.levelIndex
+                    });
+                }
+                checkAchievements();
+            }
+        }
+
         // Огонь босса: -1 HP (без щита), второе попадание — поражение
         const fire = game.hazards.find(h => h.phase === 'fire' && h.y === ny && h.x === nx);
-        if (fire && !this.hurtThisTurn && this.takeDamage(game, '💀 ПОРАЖЕНИЕ! Огонь босса настиг вас!')) {
+        if (fire && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_fire'))) {
             return true;
         }
 
@@ -319,18 +364,12 @@ class Player {
         // Огонь, вспыхнувший под игроком в этот ход (warn -> fire во время тика опасных клеток)
         if (!game.gameOver) {
             const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
-            if (fireNow && !this.hurtThisTurn && this.takeDamage(game, '💀 ПОРАЖЕНИЕ! Огонь босса настиг вас!')) {
+            if (fireNow && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_fire'))) {
                 return true;
             }
         }
 
-        // Проверяем победу
-        if (!game.gameOver && this.y === game.finish.y && this.x === game.finish.x) {
-            game.gameOver = true;
-            game.message = '🏆 ПОБЕДА!';
-            const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { levelClear: 15 };
-            game.grantCoins(R.levelClear);
-        } else if (!game.gameOver && !game.repelledThisTurn && !game.pickedKeyThisTurn && !this.hurtThisTurn) {
+        if (!game.gameOver && !game.repelledThisTurn && !game.pickedKeyThisTurn && !this.hurtThisTurn) {
             // Обновляем статусное сообщение (не затираем сообщение об уроне)
             game.updateStatusMessage();
         }
@@ -339,16 +378,30 @@ class Player {
     }
 
     /**
+     * Урон от огня, появившегося под игроком после хода врагов (при взмахе мечом)
+     * @param {Object} game - объект игры
+     * @returns {boolean} true — игрок погиб от огня
+     */
+    takeSwingFireDamage(game) {
+        if (game.gameOver) return false;
+        const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
+        if (fireNow && !this.hurtThisTurn) {
+            return this.takeDamage(game, t('msg_defeat_fire'));
+        }
+        return false;
+    }
+
+    /**
      * Взмах мечом в направлении facing: убивает обычного врага или бьёт босса
      * @param {Object} game - объект игры
      * @returns {Object|null} результат удара ({type, message}) или null
      */
     swing(game) {
-        if (game.gameOver || game.inSecretRoom) return null;
+        if (game.gameOver || game.inSecretRoom || game.shopConfirmPending) return null;
         this.hurtThisTurn = false;
 
         if (!this.hasSword) {
-            game.message = '⚔ У вас нет меча!';
+            game.message = t('msg_no_sword');
             return null;
         }
 
@@ -367,9 +420,11 @@ class Player {
                     game.message = res.message;
                     const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { boss: 30 };
                     game.grantCoins(R.boss);
+                    if (typeof updateStat === 'function') { updateStat('bossesDefeated', 1); unlockAchievement('boss_sword'); checkAchievements(); }
                 }
             }
             game.updateEnemies();
+            this.takeSwingFireDamage(game);
             return res;
         }
 
@@ -385,8 +440,8 @@ class Player {
             if (!game.gameOver) {
                 // Огонь бомбы, вспыхнувший под игроком в этот ход
                 const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
-                if (fireNow && !this.hurtThisTurn && this.takeDamage(game, '💀 ПОРАЖЕНИЕ! Бомба взорвалась!')) {
-                    return { type: 'bossDefeated', message: game.message };
+                if (fireNow && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_bomb'))) {
+                    return { type: 'playerDied', message: game.message };
                 }
             }
             return res;
@@ -396,13 +451,54 @@ class Player {
         const enemy = game.enemies.find(e => e.type !== 'boss' && e.type !== 'secretBoss' && e.y === ty && e.x === tx);
         if (enemy) {
             game.removeEnemy(enemy);
-            game.message = `⚔ ${enemy.id} убит мечом!`;
+            game.message = t('msg_enemy_sword_killed', enemy.id);
             game.updateEnemies();
+            this.takeSwingFireDamage(game);
             return { type: 'enemyKilled', message: game.message };
         }
 
-        game.message = '⚔ Взмах мимо!';
+        game.message = t('msg_swing_miss');
         game.updateEnemies();
+        this.takeSwingFireDamage(game);
         return null;
+    }
+
+    /**
+     * Выстрел из лука: создаёт снаряд в направлении взгляда
+     * @param {Object} game - объект игры
+     * @returns {Object|null} результат выстрела
+     */
+    shootBow(game) {
+        if (game.gameOver || game.inSecretRoom || game.shopConfirmPending) return null;
+        this.hurtThisTurn = false;
+
+        if (!this.hasBow) {
+            game.message = t('msg_no_bow');
+            return null;
+        }
+
+        if (this.bowCooldown > 0) {
+            game.message = t('msg_bow_reloading');
+            return null;
+        }
+
+        const dy = this.facing.dy;
+        const dx = this.facing.dx;
+        if (dy === 0 && dx === 0) {
+            game.message = t('msg_bow_no_direction');
+            return null;
+        }
+
+        this.bowCooldown = 1;
+
+        // Снаряд: стартует с клетки перед игроком
+        const startY = this.y + dy;
+        const startX = this.x + dx;
+        game.projectiles.push({ y: startY, x: startX, dy, dx, type: 'arrow' });
+        if (typeof updateStat === 'function') { updateStat('bowShots', 1); checkAchievements(); }
+
+        game.updateEnemies();
+        this.takeSwingFireDamage(game);
+        return { type: 'shot', message: t('msg_arrow_shot') };
     }
 }

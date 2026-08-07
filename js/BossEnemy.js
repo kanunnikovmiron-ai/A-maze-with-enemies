@@ -541,7 +541,7 @@ class BossEnemy extends Enemy {
             this.returnPath = [];
             this.wanderPath = [];
             this.pathGoal = null;
-            return { type: 'bossDefeated', message: '👹 Босс повержен! Финиш открыт!' };
+            return { type: 'bossDefeated', message: t('msg_boss_defeated') };
         }
 
         // Переход во 2-ю стадию (ярость) на половине HP
@@ -551,7 +551,7 @@ class BossEnemy extends Enemy {
             this.y = cell.y;
             this.x = cell.x;
             this.resetStateBlock(maze);
-            return { type: 'repelled', message: `🔥 Босс в ярости! Осталось ударов: ${this.hp}` };
+            return { type: 'repelled', message: t('msg_boss_enraged', this.hp) };
         }
 
         // Отбрасываем блок не дальше 4 шагов (можно добить)
@@ -559,7 +559,7 @@ class BossEnemy extends Enemy {
         this.y = cell.y;
         this.x = cell.x;
         this.resetStateBlock(maze);
-        return { type: 'repelled', message: `⚔ Босс отброшен! Осталось ударов: ${this.hp}` };
+        return { type: 'repelled', message: t('msg_boss_repelled_hp', this.hp) };
     }
 
     /**
@@ -604,6 +604,6 @@ class BossEnemy extends Enemy {
      * Сообщение при поимке игрока боссом
      */
     getCatchMessage() {
-        return '💀 ПОРАЖЕНИЕ! Босс 👹 поймал вас!';
+        return t('msg_boss_catch');
     }
 }

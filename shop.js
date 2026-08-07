@@ -22,7 +22,8 @@ const SHOP_ITEMS = [
         price: 50,
         desc: 'Начинайте каждый уровень с мечом (взмах — Пробел)',
         requires: null,
-        maxCount: 1
+        maxCount: 1,
+        boolean: true
     },
     {
         id: 'hpBonus',
@@ -31,7 +32,8 @@ const SHOP_ITEMS = [
         price: 30,
         desc: 'Максимум здоровья +1 (всего до +3)',
         requires: null,
-        maxCount: 3
+        maxCount: 3,
+        boolean: false
     },
     {
         id: 'swordPlus',
@@ -40,9 +42,27 @@ const SHOP_ITEMS = [
         price: 100,
         desc: 'Урон боссу 2 за взмах (требует меч)',
         requires: 'sword',
-        maxCount: 1
+        maxCount: 1,
+        boolean: true
+    },
+    {
+        id: 'bow',
+        icon: '🏹',
+        name: 'Лук',
+        price: 75,
+        desc: 'Дальнее оружие (E — стрельба, бесконечные стрелы)',
+        requires: null,
+        maxCount: 1,
+        boolean: true
     }
 ];
+
+function getShopItemName(id) {
+    return t('shop_' + id + '_name');
+}
+function getShopItemDesc(id) {
+    return t('shop_' + id + '_desc');
+}
 
 /**
  * Текущее количество монет
@@ -88,7 +108,8 @@ function getInventory() {
     return {
         sword: !!inv.sword,
         hpBonus: Math.max(0, Math.min(3, Number(inv.hpBonus) || 0)),
-        swordPlus: !!inv.swordPlus
+        swordPlus: !!inv.swordPlus,
+        bow: !!inv.bow
     };
 }
 
@@ -96,7 +117,14 @@ function getInventory() {
  * Сохранить инвентарь
  */
 function saveInventory(inv) {
-    localStorage.setItem(INVENTORY_KEY, JSON.stringify(inv));
+    const normalized = {
+        ...inv,
+        sword: !!inv.sword,
+        hpBonus: Math.max(0, Math.min(3, Number(inv.hpBonus) || 0)),
+        swordPlus: !!inv.swordPlus,
+        bow: !!inv.bow
+    };
+    localStorage.setItem(INVENTORY_KEY, JSON.stringify(normalized));
 }
 
 /**
@@ -108,7 +136,8 @@ function getShopBonuses() {
     return {
         sword: inv.sword,
         hpBonus: inv.hpBonus,
-        swordPlus: inv.swordPlus
+        swordPlus: inv.swordPlus,
+        bow: inv.bow
     };
 }
 
@@ -119,13 +148,13 @@ function getShopBonuses() {
  */
 function canBuy(id) {
     const item = SHOP_ITEMS.find(i => i.id === id);
-    if (!item) return { ok: false, reason: 'Товар не найден' };
+    if (!item) return { ok: false, reason: t('shop_err_not_found') };
     const inv = getInventory();
 
     const count = inv[id] || 0;
-    if (count >= item.maxCount) return { ok: false, reason: 'Уже куплено' };
-    if (getWallet() < item.price) return { ok: false, reason: 'Не хватает монет' };
-    if (item.requires && !inv[item.requires]) return { ok: false, reason: 'Требуется меч' };
+    if (count >= item.maxCount) return { ok: false, reason: t('shop_err_bought') };
+    if (getWallet() < item.price) return { ok: false, reason: t('shop_err_no_coins') };
+    if (item.requires && !inv[item.requires]) return { ok: false, reason: t('shop_err_need_sword') };
     return { ok: true, reason: '' };
 }
 
@@ -138,11 +167,15 @@ function buyItem(id) {
     const item = SHOP_ITEMS.find(i => i.id === id);
     const check = canBuy(id);
     if (!item || !check.ok) {
-        return { ok: false, reason: (check ? check.reason : 'Товар не найден'), item: null };
+        return { ok: false, reason: (check ? check.reason : t('shop_err_not_found')), item: null };
     }
 
     const inv = getInventory();
-    inv[id] = (inv[id] || 0) + 1;
+    if (item.boolean) {
+        inv[id] = true;
+    } else {
+        inv[id] = (inv[id] || 0) + 1;
+    }
     saveInventory(inv);
     setWallet(getWallet() - item.price);
     return { ok: true, reason: '', item: item };

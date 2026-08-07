@@ -24,7 +24,10 @@ class Game {
         this.secret = null;             // Данные секретной комнаты (или null)
         this.boss = null;               // Босс последнего уровня (или null)
         this.inSecretRoom = false;      // Игрок сейчас в секретной комнате
+        this.inShopRoom = false;        // Игрок сейчас в магазине
+        this.shop = null;               // Данные магазина (или null)
         this.hazards = [];              // Опасные клетки (огонь) на босс-арене
+        this.projectiles = [];          // Снаряды (стрелы лука)
         this.swingFlash = null;         // Клетка последнего взмаха мечом (анимация)
         this.secretBoss = null;         // Секретный босс — розовое сердце (или null)
         this.inSecretBossRoom = false;  // Игрок в арене секретного босса
@@ -32,6 +35,8 @@ class Game {
         this.secretBossCoinsGranted = false; // +30 монет за первое поверженное сердце (арена или карта)
         this.mainEnemies = null;        // Враги основного лабиринта (на время арены)
         this.mainHazards = null;        // Опасности основного лабиринта (на время арены)
+        this.mainBoss = null;           // Босс основного лабиринта (на время арены)
+        this.shopConfirmPending = false; // Ожидание подтверждения покупки в магазине
 
         // Загружаем уровень (из объекта превью или по индексу)
         const level = levelObject || resolveLevel(levelIndex);
@@ -54,6 +59,11 @@ class Game {
 
         // Создаем игрока и финиш
         this.player = new Player(level.start.y, level.start.x, this.playerConfig, this.isBossLevel || level.tutorial === true);
+        // Стартовое HP зависит от сложности
+        if (settings.startHp) {
+            this.player.maxHp = settings.startHp;
+            this.player.hp = settings.startHp;
+        }
         this.finish = { ...level.finish };
 
         // Бонусы из магазина (постоянные)
@@ -76,7 +86,7 @@ class Game {
         // Пикапы из placements редактора (меч, бафы)
         this.pickups = [];
         for (const p of placements) {
-            if (p.type === 'sword' || p.type === 'buffHp' || p.type === 'buffInv') {
+            if (p.type === 'sword' || p.type === 'buffHp' || p.type === 'buffInv' || p.type === 'bow') {
                 this.pickups.push({ type: p.type, y: p.y, x: p.x, collected: false });
             }
         }
@@ -98,6 +108,8 @@ class Game {
         this.repelledThisTurn = false;
         this.pickedKeyThisTurn = false;
         this.coinsEarned = 0; // Монеты, заработанные за текущий уровень
+        this.moves = 0;       // Количество ходов игрока
+        this.levelHits = 0;   // Количество полученных ударов за уровень
         this.message = this.getStartMessage(level);
 
         // Инициализируем отрисовку
@@ -109,14 +121,31 @@ class Game {
         // Комната магазина (дверь на каждом уровне)
         this.buildShop();
 
+        // Дверь магазина всегда видна через туман
+        if (this.shop && this.fogEnabled) {
+            const ey = this.shop.entrance.y, ex = this.shop.entrance.x;
+            for (let dy = -2; dy <= 2; dy++) {
+                for (let dx = -2; dx <= 2; dx++) {
+                    const ny = ey + dy, nx = ex + dx;
+                    if (ny >= 0 && ny < this.rows && nx >= 0 && nx < this.cols) {
+                        this.explored[ny][nx] = true;
+                    }
+                }
+            }
+        }
+
         // Арена секретного босса (розовая трещина, шанс ~15%)
         this.buildSecretBoss();
 
         // Музыка: сердца на карте — музыка секретного босса, иначе музыка арены босса
         if (this.hasLiveSecretBoss()) {
             this.playSecretBossMusic();
+            if (typeof pauseLevelMusic === 'function') pauseLevelMusic();
         } else if (this.isBossLevel) {
             this.playBossMusic();
+            if (typeof pauseLevelMusic === 'function') pauseLevelMusic();
+        } else {
+            if (typeof playLevelMusic === 'function') playLevelMusic();
         }
     }
 
@@ -134,6 +163,7 @@ class Game {
             this.player.hp = this.player.maxHp;
         }
         if (bonus.swordPlus) this.player.swordPlus = true;
+        if (bonus.bow) this.player.giveBow();
     }
 
     /**
@@ -145,6 +175,7 @@ class Game {
         if (typeof addCoins !== 'function') return;
         this.coinsEarned += amount;
         addCoins(amount);
+        if (typeof updateStat === 'function') { updateStat('coinsEver', amount); checkAchievements(); }
     }
 
     /**
@@ -170,12 +201,22 @@ class Game {
      */
     getRandomPassable(exclude = []) {
         const all = this.getAllPassable();
+        if (all.length === 0) return null;
         const available = all.filter(c =>
             !exclude.some(e => e.y === c.y && e.x === c.x)
         );
         return available.length > 0
             ? available[Math.floor(Math.random() * available.length)]
-            : all[0];
+            : all[Math.floor(Math.random() * all.length)];
+    }
+
+    /**
+     * Отметить уровень пройденным: открывает следующий по очереди.
+     * Превью из редактора прогресс не сохраняет.
+     */
+    markLevelCompleted() {
+        if (this.isPreview) return;
+        if (typeof setMaxUnlocked === 'function') setMaxUnlocked(this.levelIndex + 1);
     }
 
     /**
@@ -274,7 +315,9 @@ class Game {
         if (!pos) {
             // Крайний случай: без блока 2x2 ставим босса на первую проходимую клетку,
             // update() сам выправит позицию в безопасный блок
-            const first = this.getAllPassable()[0];
+            const passable = this.getAllPassable();
+            if (passable.length === 0) return null;
+            const first = passable[0];
             pos = {
                 y: Math.max(0, Math.min(first.y, this.rows - 2)),
                 x: Math.max(0, Math.min(first.x, this.cols - 2))
@@ -306,10 +349,11 @@ class Game {
         if (enemy && enemy.type) {
             const R = (typeof COIN_REWARDS !== 'undefined')
                 ? COIN_REWARDS
-                : { enemy: 5, patrol: 8, boss: 30, levelClear: 15 };
+                : { enemy: 3, patrol: 5, boss: 30, levelClear: 10 };
             const reward = (enemy.type === 'patrol') ? R.patrol : R.enemy;
             this.grantCoins(reward);
         }
+        if (typeof updateStat === 'function') { updateStat('totalKills', 1); checkAchievements(); }
     }
 
     /**
@@ -412,8 +456,18 @@ class Game {
         // В секретной комнате и в магазине враги не двигаются
         if (this.inSecretRoom || this.inShopRoom) return;
 
+        // Огонь бомб бьёт обычных врагов и стражей (до тика — огонь ttl=1 ещё на карте)
+        const burned = this.enemies.filter(e =>
+            (e.type === 'enemy' || e.type === 'patrol') &&
+            this.hazards.some(h => h.phase === 'fire' && h.y === e.y && h.x === e.x)
+        );
+        for (const e of burned) this.removeEnemy(e);
+
         // Тикаем опасные клетки (предупреждения -> огонь, огонь тает)
         this.tickHazards();
+
+        // Двигаем снаряды (стрелы лука)
+        this.updateProjectiles();
 
         for (const enemy of this.enemies) {
             const result = enemy.update(
@@ -430,14 +484,18 @@ class Game {
                 if (this.player.hurtThisTurn) {
                     if (enemy.type === 'boss') {
                         const cell = enemy.getKnockbackCell(this.player, this.maze, this.enemies);
-                        enemy.y = cell.y;
-                        enemy.x = cell.x;
-                        enemy.resetStateBlock(this.maze);
+                        if (cell) {
+                            enemy.y = cell.y;
+                            enemy.x = cell.x;
+                            enemy.resetStateBlock(this.maze);
+                        }
                     } else {
                         const cell = this.getRandomPassable([this.player, ...this.enemies.filter(e => e !== enemy)]);
-                        enemy.y = cell.y;
-                        enemy.x = cell.x;
-                        enemy.resetState(this.maze);
+                        if (cell) {
+                            enemy.y = cell.y;
+                            enemy.x = cell.x;
+                            enemy.resetState(this.maze);
+                        }
                     }
                     this.repelledThisTurn = true;
                     break;
@@ -496,6 +554,77 @@ class Game {
     }
 
     /**
+     * Обновление снарядов (стрелы лука): движение, столкновения со стенами/врагами
+     */
+    updateProjectiles() {
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            const ny = p.y + p.dy;
+            const nx = p.x + p.dx;
+
+            // Столкновение со стеной или краем карты — снаряд исчезает
+            if (!PathFinder.isPassable(ny, nx, this.maze, this.rows, this.cols)) {
+                this.projectiles.splice(i, 1);
+                continue;
+            }
+
+            // Столкновение с боссом (2x2)
+            if (this.boss && !this.boss.defeated && this.boss.blockCovers(this.boss.y, this.boss.x, ny, nx)) {
+                this.boss.hp -= 1;
+                this.projectiles.splice(i, 1);
+                if (this.boss.hp <= 0) {
+                    this.boss.defeated = true;
+                    this.boss.chase = false;
+                    this.boss.searching = false;
+                    this.boss.path = [];
+                    this.boss.returnPath = [];
+                    this.boss.wanderPath = [];
+                    this.boss.pathGoal = null;
+                    this.message = t('msg_boss_arrow_killed');
+                    this.repelledThisTurn = true;
+                    const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { boss: 30 };
+                    this.grantCoins(R.boss);
+                    if (typeof updateStat === 'function') { updateStat('bossesDefeated', 1); unlockAchievement('boss_arrow'); checkAchievements(); }
+                } else if (this.boss.hp <= Math.floor(this.boss.maxHp / 2) && this.boss.stage === 1) {
+                    this.boss.stage = 2;
+                    this.message = t('msg_boss_enraged', this.boss.hp);
+                } else {
+                    this.message = t('msg_boss_arrow_hit', this.boss.hp);
+                }
+                continue;
+            }
+
+            // Столкновение с секретным боссом (1x1) — проверяем ДО обычных врагов
+            const secretBoss = this.enemies.find(e => e.type === 'secretBoss' && e.y === ny && e.x === nx);
+            if (secretBoss) {
+                const res = secretBoss.takeSwordHit(this);
+                this.projectiles.splice(i, 1);
+                if (res) {
+                    this.message = res.message;
+                    this.repelledThisTurn = true;
+                }
+                continue;
+            }
+
+            // Столкновение с обычным врагом
+            const enemy = this.enemies.find(e =>
+                e.type !== 'boss' && e.type !== 'secretBoss' && e.y === ny && e.x === nx
+            );
+            if (enemy) {
+                this.removeEnemy(enemy);
+                this.projectiles.splice(i, 1);
+                this.message = t('msg_enemy_arrow_killed', enemy.id);
+                if (typeof updateStat === 'function') { updateStat('arrowKills', 1); checkAchievements(); }
+                continue;
+            }
+
+            // Двигаем снаряд на 1 клетку
+            p.y = ny;
+            p.x = nx;
+        }
+    }
+
+    /**
      * Взрыв бомбы крестом до границы/стены: поджигает центр и весь луч
      * в 4 ортогональных направлениях, пока не упрётся в стену или край карты.
      * @param {Object} h - детонировавшая бомба (центр взрыва)
@@ -533,18 +662,18 @@ class Game {
         const lockIcon = this.isFinishLocked() ? '🔒' : '🔓';
 
         if (chasing.length > 0) {
-            this.message = `⚠️ Видят! ${lockIcon} ${keyInfo}`.trim();
+            this.message = (t('msg_status_spotted') + ' ' + lockIcon + ' ' + keyInfo).trim();
         } else if (searching.length > 0) {
-            this.message = `🔍 Ищут. ${lockIcon} ${keyInfo}`.trim();
+            this.message = (t('msg_status_searching') + ' ' + lockIcon + ' ' + keyInfo).trim();
         } else if (waiting.length > 0) {
             const maxWait = Math.max(...waiting.map(e => e.loseCount));
-            this.message = `⏳ Ждут (${maxWait}/${this.enemyConfig.agroLimit}). ${lockIcon} ${keyInfo}`.trim();
+            this.message = (t('msg_status_waiting', maxWait, this.enemyConfig.agroLimit) + ' ' + lockIcon + ' ' + keyInfo).trim();
         } else if (this.level.tutorial) {
             this.message = this.tutorialHint();
         } else if (this.keyConfig.enabled && !this.hasAllKeys()) {
-            this.message = `🔑 Соберите части ключа (${this.keysCollected}/${this.keys.length}). ${lockIcon}`;
+            this.message = t('msg_keys_collect', this.keysCollected, this.keys.length) + ' ' + lockIcon;
         } else {
-            this.message = this.isFinishLocked() ? '🔒 Финиш заблокирован!' : '🔓 Открыт!';
+            this.message = this.isFinishLocked() ? t('msg_finish_locked') : t('msg_finish_open');
         }
     }
 
@@ -555,15 +684,15 @@ class Game {
     tutorialHint() {
         const lockIcon = this.isFinishLocked() ? '🔒' : '🔓';
         if (this.keyConfig.enabled && !this.hasAllKeys()) {
-            return `🔑 Соберите обе части ключа (${this.keysCollected}/${this.keys.length}). ${lockIcon}`;
+            return t('tut_collect_keys', this.keysCollected, this.keys.length, lockIcon);
         }
         if (!this.player.hasSword) {
-            return `🗝 Найдите трещину в стене — за ней ⚔ меч. ${lockIcon}`;
+            return t('tut_find_crack', lockIcon);
         }
         if (this.enemies.length > 0) {
-            return '⚔ Бейте врагов Пробелом!';
+            return t('tut_kill_enemies');
         }
-        return '🏁 Идите к финишу!';
+        return t('tut_go_finish');
     }
 
     /**
@@ -572,20 +701,20 @@ class Game {
      * @returns {string}
      */
     getStartMessage(level) {
-        let msg = `🗺 Уровень ${this.levelIndex + 1}: "${level.name}".`;
+        let msg = t('start_map', this.levelIndex + 1, getLevelName(level, this.levelIndex));
         if (this.keyConfig.enabled && this.keys.length > 0) {
-            msg += ` 🔑 Соберите ${this.keyConfig.count} части ключа, чтобы открыть финиш.`;
+            msg += t('start_collect_keys', this.keyConfig.count);
         } else if (this.finishConfig.lockWhenChased) {
-            msg += ' 🔒 Финиш заблокирован при погоне.';
+            msg += t('start_finish_chase');
         }
         if (this.fogEnabled) {
-            msg += ' 🌫 Туман войны: исследуйте карту.';
+            msg += t('start_fog');
         }
         if (this.playerConfig.invincible) {
-            msg = '🛡 Неуязвимость. ' + msg;
+            msg = t('start_invincible') + msg;
         }
         if (level.tutorial) {
-            msg += ' 📖 Соберите 🔑 ключи, найдите 🗝 трещину в стене, возьмите ⚔ меч, победите врагов и дойдите до финиша.';
+            msg += t('start_tutorial_hint');
         }
         return msg;
     }
@@ -682,11 +811,12 @@ class Game {
         // Открытая комната 10x10 без лабиринта (по краям стены)
         const roomMaze = this.generateShopMaze();
 
-        // 3 пьедестала: колонна, напрямую достижима от входа (1,1)
+        // 4 пьедестала: колонна, напрямую достижимы от входа (1,1)
         const pedestals = [
             { itemId: 'sword',     y: 2, x: 3 },
             { itemId: 'hpBonus',   y: 4, x: 3 },
-            { itemId: 'swordPlus', y: 6, x: 3 }
+            { itemId: 'swordPlus', y: 6, x: 3 },
+            { itemId: 'bow',       y: 8, x: 3 }
         ];
         // Гарантируем проходимость клеток пьедесталов
         for (const p of pedestals) {
@@ -722,11 +852,14 @@ class Game {
      * Вход в комнату магазина
      */
     enterShopRoom() {
-        if (!this.shop || this.inShopRoom || this.inSecretRoom) return false;
+        if (!this.shop || this.inShopRoom || this.inSecretRoom || this.inSecretBossRoom) return false;
 
         this.mainMaze = this.maze;
         this.mainRows = this.rows;
         this.mainCols = this.cols;
+        this.mainEnemies = this.enemies;
+        this.mainHazards = this.hazards;
+        this.mainProjectiles = this.projectiles;
         this.shop.back = { y: this.player.y, x: this.player.x };
 
         this.maze = this.shop.roomMaze;
@@ -738,9 +871,10 @@ class Game {
         this.player.prevX = this.player.x;
         this.inShopRoom = true;
 
-        this.message = '🛒 Магазин! Подойдите к пьедесталу, чтобы купить.';
+        this.message = t('msg_shop_enter');
         this.stopBossMusic();
         this.stopSecretBossMusic();
+        if (typeof pauseLevelMusic === 'function') pauseLevelMusic();
         this.playShopMusic();
         return true;
     }
@@ -754,13 +888,17 @@ class Game {
         this.maze = this.mainMaze;
         this.rows = this.mainRows;
         this.cols = this.mainCols;
+        this.enemies = this.mainEnemies;
+        this.hazards = this.mainHazards;
+        this.projectiles = this.mainProjectiles;
         this.player.y = this.shop.back.y;
         this.player.x = this.shop.back.x;
         this.player.prevY = this.player.y;
         this.player.prevX = this.player.x;
         this.inShopRoom = false;
+        this.player.facing = { dy: -1, dx: 0 };
 
-        this.message = 'Выход из магазина.';
+        this.message = t('msg_shop_exit');
         this.stopShopMusic();
         this.resumeLevelMusic();
         return true;
@@ -843,6 +981,9 @@ class Game {
         this.mainCols = this.cols;
         this.mainEnemies = this.enemies;
         this.mainHazards = this.hazards;
+        this.mainProjectiles = this.projectiles;
+        this.mainExplored = this.explored;
+        this.mainBoss = this.boss;
         this.secretBoss.back = { y: this.player.y, x: this.player.x };
 
         // Арена 15x15 — открытое пространство с бортиком
@@ -850,6 +991,14 @@ class Game {
         this.rows = this.maze.length;
         this.cols = this.maze[0].length;
         this.hazards = [];
+        this.projectiles = [];
+        this.explored = [];
+        for (let y = 0; y < this.rows; y++) {
+            this.explored[y] = [];
+            for (let x = 0; x < this.cols; x++) {
+                this.explored[y][x] = false;
+            }
+        }
         this.player.y = this.secretBoss.entryPos.y;
         this.player.x = this.secretBoss.entryPos.x;
         this.player.prevY = this.player.y;
@@ -877,9 +1026,10 @@ class Game {
         this.inSecretBossRoom = true;
 
         this.message = this.secretBoss.defeated
-            ? '💖 Секретный босс уже повержен. Выход — через трещину.'
-            : '💖 Секретный босс! Одолейте розовое сердце и получите 30 монет!';
+            ? t('msg_secret_boss_arena_defeated')
+            : t('msg_secret_boss_arena_enter');
         this.stopBossMusic();
+        if (typeof pauseLevelMusic === 'function') pauseLevelMusic();
         this.playSecretBossMusic();
         return true;
     }
@@ -895,11 +1045,15 @@ class Game {
         this.cols = this.mainCols;
         this.enemies = this.mainEnemies;
         this.hazards = this.mainHazards;
+        this.projectiles = this.mainProjectiles;
+        this.explored = this.mainExplored;
+        this.boss = this.mainBoss;
         this.player.y = this.secretBoss.back.y;
         this.player.x = this.secretBoss.back.x;
         this.player.prevY = this.player.y;
         this.player.prevX = this.player.x;
         this.inSecretBossRoom = false;
+        this.player.facing = { dy: -1, dx: 0 };
 
         // Восстанавливаем исходное HP игрока после арены
         if (this.secretBoss.hpBackup) {
@@ -908,7 +1062,7 @@ class Game {
             delete this.secretBoss.hpBackup;
         }
 
-        this.message = 'Выход из арены секретного босса.';
+        this.message = t('msg_secret_boss_arena_exit');
         this.stopSecretBossMusic();
         this.resumeLevelMusic();
         return true;
@@ -937,11 +1091,47 @@ class Game {
     buyOnPedestal(itemId) {
         const res = buyItem(itemId);
         if (res.ok) {
-            this.message = `✅ Куплено: ${res.item.icon} ${res.item.name}! (баланс: ${getWallet()} 🪙)`;
+            this.message = t('msg_shop_bought', res.item.icon, getShopItemName(res.item.id), getWallet());
+            if (typeof updateStat === 'function') { updateStat('shopBuys', 1); if (itemId === 'swordPlus') unlockAchievement('sword_plus'); checkAchievements(); }
         } else {
-            this.message = '❌ ' + res.reason;
+            this.message = t('msg_shop_fail', res.reason);
         }
+        this.shopConfirmPending = false;
         return res.ok;
+    }
+
+    /**
+     * Показать модалку подтверждения покупки товара
+     * @param {string} itemId
+     */
+    showShopConfirm(itemId) {
+        const item = SHOP_ITEMS.find(i => i.id === itemId);
+        if (!item) return;
+        const check = canBuy(itemId);
+
+        if (!check.ok) {
+            this.message = t('msg_shop_fail', check.reason);
+            return;
+        }
+
+        this._shopConfirmItem = itemId;
+        this.shopConfirmPending = true;
+
+        const modal = document.getElementById('shop-confirm');
+        const icon = document.getElementById('shop-confirm-icon');
+        const name = document.getElementById('shop-confirm-name');
+        const price = document.getElementById('shop-confirm-price');
+        const coins = document.getElementById('shop-confirm-coins');
+        const buyBtn = modal.querySelector('[onclick="shopConfirmBuy()"]');
+
+        icon.textContent = item.icon;
+        name.textContent = getShopItemName(item.id);
+        price.textContent = t('shop_confirm_price', item.price);
+        coins.textContent = t('shop_confirm_coins', getWallet());
+        buyBtn.disabled = false;
+        buyBtn.textContent = t('shop_confirm_buy');
+
+        modal.classList.remove('hidden');
     }
 
     /**
@@ -1041,12 +1231,16 @@ class Game {
      * Вход в секретную комнату
      */
     enterSecretRoom() {
-        if (!this.secret || this.secret.used || this.inSecretRoom) return false;
+        if (!this.secret || this.secret.used || this.inSecretRoom || this.inShopRoom || this.inSecretBossRoom) return false;
 
         // Запоминаем текущее состояние основного лабиринта
         this.mainMaze = this.maze;
         this.mainRows = this.rows;
         this.mainCols = this.cols;
+        this.mainExplored = this.explored;
+        this.mainEnemies = this.enemies;
+        this.mainHazards = this.hazards;
+        this.mainProjectiles = this.projectiles;
         this.secret.back = { y: this.player.y, x: this.player.x };
 
         // Переключаемся на комнату
@@ -1058,10 +1252,12 @@ class Game {
         this.player.prevY = this.player.y;
         this.player.prevX = this.player.x;
         this.inSecretRoom = true;
+        if (typeof updateStat === 'function') { updateStat('secretRoomsFound', 1); checkAchievements(); }
 
-        this.message = '🗝 Секретная комната! Возьмите ⚔ меч или вернитесь через портал.';
+        this.message = t('msg_secret_room');
         this.stopBossMusic();
         this.stopSecretBossMusic();
+        if (typeof pauseLevelMusic === 'function') pauseLevelMusic();
         this.playSecretMusic();
         return true;
     }
@@ -1153,10 +1349,16 @@ class Game {
         if (this.inSecretBossRoom) return;
         if (this.hasLiveSecretBoss()) {
             this.stopBossMusic();
+            if (typeof pauseLevelMusic === 'function') pauseLevelMusic();
             this.playSecretBossMusic();
+        } else if (this.isBossLevel) {
+            this.stopSecretBossMusic();
+            if (typeof pauseLevelMusic === 'function') pauseLevelMusic();
+            this.playBossMusic();
         } else {
             this.stopSecretBossMusic();
-            if (this.isBossLevel) this.playBossMusic();
+            this.stopBossMusic();
+            if (typeof resumeLevelMusicGlobal === 'function') resumeLevelMusicGlobal();
         }
     }
 
@@ -1211,23 +1413,44 @@ class Game {
         this.maze = this.mainMaze;
         this.rows = this.mainRows;
         this.cols = this.mainCols;
+        this.explored = this.mainExplored;
+        this.enemies = this.mainEnemies;
+        this.hazards = this.mainHazards;
+        this.projectiles = this.mainProjectiles;
         this.player.y = this.secret.back.y;
         this.player.x = this.secret.back.x;
         this.player.prevY = this.player.y;
         this.player.prevX = this.player.x;
         this.inSecretRoom = false;
+        this.player.facing = { dy: -1, dx: 0 };
 
         if (picked) {
             // Комната "использована" только после подбора меча:
             // иначе на уровне босса выход без меча навсегда блокировал бы вход (софтлок)
             this.secret.used = true;
             this.player.giveSword();
-            this.message = '⚔ Вы взяли меч! Теперь Пробел — взмах по врагам.';
+            this.message = t('msg_got_sword');
         } else {
-            this.message = 'Выход из секретной комнаты.';
+            this.message = t('msg_secret_exit');
         }
         this.stopSecretMusic();
         this.resumeLevelMusic();
         return true;
     }
+}
+
+// Глобальные функции для модалки подтверждения покупки
+function shopConfirmBuy() {
+    if (!currentGame || !currentGame._shopConfirmItem) return;
+    const itemId = currentGame._shopConfirmItem;
+    document.getElementById('shop-confirm').classList.add('hidden');
+    currentGame.buyOnPedestal(itemId);
+    currentGame._shopConfirmItem = null;
+}
+
+function shopConfirmCancel() {
+    if (!currentGame) return;
+    document.getElementById('shop-confirm').classList.add('hidden');
+    currentGame.shopConfirmPending = false;
+    currentGame._shopConfirmItem = null;
 }

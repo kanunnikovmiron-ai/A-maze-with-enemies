@@ -16,11 +16,14 @@ function escapeHtml(str) {
  * @param {string} id - ID экрана для отображения
  */
 function showScreen(id) {
-    ['menu-screen','password-screen','level-select-screen','difficulty-screen','tutorial-screen','admin-screen','editor-screen','game-screen','end-screen'].forEach(s => {
-        document.getElementById(s).classList.add('hidden');
+    ['menu-screen','password-screen','level-select-screen','difficulty-screen','tutorial-screen','admin-screen','editor-screen','game-screen','end-screen','achievements-screen','lang-screen'].forEach(s => {
+        const el = document.getElementById(s);
+        if (el) el.classList.add('hidden');
     });
-    document.getElementById(id).classList.remove('hidden');
+    const target = document.getElementById(id);
+    if (target) target.classList.remove('hidden');
     if (id === 'level-select-screen') renderLevelButtons();
+    if (id === 'achievements-screen') renderAchievementsScreen();
 
     // Музыка меню: играет на любом экране меню, останавливается при запуске игры
     if (id === 'game-screen') {
@@ -62,18 +65,22 @@ function stopMenuMusic() {
 }
 
 /**
- * Случайный индекс основного уровня (обучающий уровень исключён)
+ * Случайный индекс открытого основного уровня (обучающий уровень исключён)
  * @returns {number}
  */
 function randomMainLevelIndex() {
-    return 1 + Math.floor(Math.random() * (getTotalLevels() - 1));
+    const max = Math.min(getMaxUnlocked(), getTotalLevels() - 1);
+    if (max < 1) return 1;
+    return 1 + Math.floor(Math.random() * max);
 }
 
 /**
- * Начать игру со случайным уровнем
+ * Начать игру: продолжить с первого непройденного уровня
+ * (или заново с обучения, если всё пройдено)
  */
 function startGame() {
-    selectedLevel = randomMainLevelIndex();
+    const max = getMaxUnlocked();
+    selectedLevel = max >= getTotalLevels() ? 0 : max;
     showScreen('game-screen');
     initGame();
 }
@@ -112,6 +119,35 @@ function isTutorialDone() {
     return localStorage.getItem(TUTORIAL_FLAG) === '1';
 }
 
+// Прогресс прохождения: последний открытый уровень (индекс в общем списке)
+const UNLOCK_KEY = 'miron_unlocked';
+
+/**
+ * Последний открытый уровень (по умолчанию 0 — обучение)
+ * @returns {number}
+ */
+function getMaxUnlocked() {
+    const v = parseInt(localStorage.getItem(UNLOCK_KEY), 10);
+    return isNaN(v) ? 0 : v;
+}
+
+/**
+ * Открыть уровень (только вперёд)
+ * @param {number} i - индекс уровня
+ */
+function setMaxUnlocked(i) {
+    if (i > getMaxUnlocked()) localStorage.setItem(UNLOCK_KEY, String(i));
+}
+
+/**
+ * Открыт ли уровень i (последовательное прохождение)
+ * @param {number} i - индекс уровня
+ * @returns {boolean}
+ */
+function isLevelUnlocked(i) {
+    return i <= getMaxUnlocked();
+}
+
 /**
  * Завершить обучение и сразу начать обучающий уровень
  */
@@ -146,6 +182,24 @@ function showEditor() {
     requestProtectedScreen('editor-screen');
 }
 
+function showAchievements() {
+    showScreen('achievements-screen');
+}
+
+function showLangScreen() {
+    showScreen('lang-screen');
+}
+
+function resetProgress() {
+    if (!confirm(t('nav_reset_confirm'))) return;
+    localStorage.removeItem('miron_wallet');
+    localStorage.removeItem('miron_inventory');
+    localStorage.removeItem('miron_achievements');
+    localStorage.removeItem('miron_unlocked');
+    localStorage.removeItem('miron_tutorial_done');
+    location.reload();
+}
+
 // Пароль доступа к админ-панели и редактору
 const ADMIN_PASSWORD = '31415lol';
 
@@ -178,7 +232,7 @@ function submitPassword() {
         showScreen(target);
         if (target === 'editor-screen' && typeof initEditorUI === 'function') initEditorUI();
     } else {
-        if (msg) msg.textContent = '❌ Неверный пароль';
+        if (msg) msg.textContent = t('password_wrong');
         if (input) { input.value = ''; input.focus(); }
     }
 }
@@ -195,6 +249,7 @@ function cancelPassword() {
  * Вернуться в главное меню
  */
 function backToMenu() {
+    if (typeof stopLevelMusic === 'function') stopLevelMusic();
     showScreen('menu-screen');
 }
 
@@ -208,7 +263,9 @@ function backToMenuFromGame() {
         currentGame.stopShopMusic();
         currentGame.stopSecretMusic();
         currentGame.stopSecretBossMusic();
+        currentGame = null;
     }
+    if (typeof stopLevelMusic === 'function') stopLevelMusic();
     showScreen('menu-screen');
 }
 
@@ -217,17 +274,28 @@ function backToMenuFromGame() {
  */
 function renderLevelButtons() {
     const container = document.getElementById('levelButtons');
-    let html = LEVELS.map((l, i) => `
-        <div class="level-num${l.tutorial ? ' tutorial' : ''}" onclick="selectLevel(${i})" title="${escapeHtml(l.name)}">${l.tutorial ? '0' : i}</div>
-    `).join('');
+    const max = getMaxUnlocked();
+    let html = LEVELS.map((l, i) => {
+        if (i > max) {
+            return `<div class="level-num locked" title="${t('level_locked_title')}">🔒</div>`;
+        }
+        return `
+        <div class="level-num${l.tutorial ? ' tutorial' : ''}" onclick="selectLevel(${i})" title="${escapeHtml(getLevelName(l, i))}">${l.tutorial ? '0' : i}</div>
+    `;
+    }).join('');
 
     // Пользовательские уровни из редактора
     CUSTOM_LEVELS.forEach((l, j) => {
         const idx = LEVELS.length + j;
+        const locked = idx > max;
+        const inner = locked
+            ? `<span class="custom-label">🔒</span>
+               <span class="custom-del" onclick="event.stopPropagation(); removeCustomLevelAt(${j}); renderLevelButtons();">🗑</span>`
+            : `<span class="custom-label">${escapeHtml(l.name)}</span>
+               <span class="custom-del" onclick="event.stopPropagation(); removeCustomLevelAt(${j}); renderLevelButtons();">🗑</span>`;
         html += `
-        <div class="level-num custom" onclick="selectLevel(${idx})" title="${escapeHtml(l.name)}">
-            <span class="custom-label">${escapeHtml(l.name)}</span>
-            <span class="custom-del" onclick="event.stopPropagation(); removeCustomLevelAt(${j}); renderLevelButtons();">🗑</span>
+        <div class="level-num custom${locked ? ' locked' : ''}" onclick="${locked ? '' : 'selectLevel(' + idx + ')'}" title="${escapeHtml(l.name)}">
+            ${inner}
         </div>`;
     });
 
@@ -242,6 +310,7 @@ let selectedLevel = 0;
  * @param {number} i - индекс уровня
  */
 function selectLevel(i) {
+    if (!isLevelUnlocked(i)) return;
     selectedLevel = i;
     showScreen('game-screen');
     initGame();
@@ -256,6 +325,7 @@ let difficulty = 'medium';
  */
 function setDifficulty(d) {
     difficulty = d;
+    try { localStorage.setItem('miron_difficulty', d); } catch (e) {}
     document.querySelectorAll('#difficulty-screen .menu-btn').forEach(b => b.style.outline = 'none');
     const map = { easy: 0, medium: 1, hard: 2 };
     document.querySelectorAll('#difficulty-screen .menu-btn')[map[d]].style.outline = '2px solid #fff';
@@ -299,10 +369,10 @@ function applyAdmin() {
     }
 
     const btn = document.querySelector('#admin-screen .apply-btn');
-    btn.textContent = '✅ Применено!';
+    btn.textContent = t('admin_applied');
     btn.style.background = '#4f4';
     setTimeout(() => {
-        btn.textContent = '✅ Применить';
+        btn.textContent = t('admin_apply');
         btn.style.background = '#a6f';
     }, 1000);
 
@@ -359,11 +429,11 @@ function getSettings() {
     // Возвращаем настройки в зависимости от сложности
     switch(difficulty) {
         case 'easy':
-            return { ...def, enemyCount: 2, patrolCount: 1, agroLimit: 4, keys: 'no', fromAdmin: false };
+            return { ...def, enemyCount: 2, patrolCount: 1, agroLimit: 4, keys: 'no', startHp: 3, fromAdmin: false };
         case 'medium':
-            return { ...def, enemyCount: 3, patrolCount: 2, agroLimit: 3, keys: 'yes', fog: 'no', fromAdmin: false };
+            return { ...def, enemyCount: 3, patrolCount: 2, agroLimit: 3, keys: 'yes', fog: 'no', startHp: 2, fromAdmin: false };
         case 'hard':
-            return { ...def, enemyCount: 4, patrolCount: 2, agroLimit: 2, keys: 'yes', fog: 'yes', fromAdmin: false };
+            return { ...def, enemyCount: 4, patrolCount: 2, agroLimit: 2, keys: 'yes', fog: 'yes', startHp: 1, fromAdmin: false };
         default:
             return { ...def, fromAdmin: false };
     }
@@ -371,6 +441,16 @@ function getSettings() {
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
+    // Восстановить сложность из localStorage
+    try {
+        const saved = localStorage.getItem('miron_difficulty');
+        if (saved && ['easy', 'medium', 'hard'].includes(saved)) difficulty = saved;
+    } catch (e) {}
     updateEnemyDistribution();
     playMenuMusic();
+    // Применить перевод при загрузке
+    if (typeof applyUITranslations === 'function') applyUITranslations();
+    // Обновить легенду игры
+    const legendEl = document.getElementById('game-legend');
+    if (legendEl) legendEl.innerHTML = t('game_legend', '<span id="levelNumDisplay"></span>');
 });

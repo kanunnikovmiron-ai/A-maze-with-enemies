@@ -126,9 +126,10 @@ class SecretBossEnemy extends Enemy {
                 game.grantCoins(R.secretBoss);
                 game.secretBossCoinsGranted = true;
             }
+            if (typeof updateStat === 'function') { updateStat('secretBossDefeated', 1); unlockAchievement('secret_killer'); checkAchievements(); }
             return {
                 type: 'bossDefeated',
-                message: first ? '💖 Секретный босс повержен! (+30 монет)' : '💖 Секретный босс повержен!'
+                message: first ? t('msg_secret_boss_defeated_first') : t('msg_secret_boss_defeated')
             };
         }
 
@@ -139,20 +140,20 @@ class SecretBossEnemy extends Enemy {
         this.homeY = cell.y;
         this.homeX = cell.x;
         this.resetState(game.maze);
-        return { type: 'repelled', message: `💖 Босс отброшен! Осталось HP: ${this.hp}` };
+        return { type: 'repelled', message: t('msg_secret_boss_repelled', this.hp) };
     }
 
     /**
      * Сообщение при поимке игрока
      */
     getCatchMessage() {
-        return '💀 ПОРАЖЕНИЕ! Розовое сердце коснулось вас!';
+        return t('msg_defeat_heart');
     }
 
     /**
      * Сообщение при отбрасывании
      */
     getRepelMessage() {
-        return '🛡 Сердце отброшено.';
+        return t('msg_heart_repelled');
     }
 }

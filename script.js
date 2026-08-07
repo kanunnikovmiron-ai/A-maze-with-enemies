@@ -3,20 +3,55 @@
 /**
  * Глобальные переменные
  */
-let currentGame = null; // Текущая игра
+let currentGame = null;
+let levelAudio = null;
+
+function playLevelMusic() {
+    try {
+        if (!levelAudio) {
+            levelAudio = new Audio('audio/02. Diptera Sonata.mp3');
+            levelAudio.loop = true;
+            levelAudio.volume = 0.35;
+        }
+        if (levelAudio.paused) {
+            levelAudio.currentTime = 0;
+            const p = levelAudio.play();
+            if (p && p.catch) p.catch(() => {});
+        }
+    } catch (e) { /* аудио не должно ломать игру */ }
+}
+
+function pauseLevelMusic() {
+    try {
+        if (levelAudio && !levelAudio.paused) levelAudio.pause();
+    } catch (e) {}
+}
+
+function resumeLevelMusicGlobal() {
+    try {
+        if (levelAudio && levelAudio.paused) {
+            const p = levelAudio.play();
+            if (p && p.catch) p.catch(() => {});
+        }
+    } catch (e) {}
+}
+
+function stopLevelMusic() {
+    try {
+        if (levelAudio) { levelAudio.pause(); levelAudio.currentTime = 0; }
+    } catch (e) {}
+}
 
 /**
  * Инициализация новой игры
  */
 function initGame() {
-    // Останавливаем музыку секретной комнаты и арены босса от прошлой игры
     if (currentGame) {
         currentGame.stopSecretMusic();
         currentGame.stopBossMusic();
         currentGame.stopShopMusic();
         currentGame.stopSecretBossMusic();
     }
-    // Останавливаем музыку меню
     stopMenuMusic();
     const settings = getSettings();
     currentGame = new Game(selectedLevel, settings);
@@ -24,10 +59,10 @@ function initGame() {
 }
 
 /**
- * Перезапуск игры со случайным уровнем
+ * Перезапуск игры со случайным открытым уровнем
  */
 function restartGame() {
-    selectedLevel = Math.floor(Math.random() * getTotalLevels());
+    selectedLevel = getMaxUnlocked() >= 1 ? randomMainLevelIndex() : 0;
     initGame();
 }
 
@@ -66,6 +101,7 @@ function stopGameMusic() {
         currentGame.stopShopMusic();
         currentGame.stopSecretBossMusic();
     }
+    if (typeof stopLevelMusic === 'function') stopLevelMusic();
 }
 
 /**
@@ -80,6 +116,7 @@ function initPreviewLevel(level) {
         currentGame.stopSecretBossMusic();
     }
     stopMenuMusic();
+    if (typeof stopLevelMusic === 'function') stopLevelMusic();
     currentGame = new Game(-1, getSettings(), level);
     currentGame.renderer.draw();
 }
@@ -120,34 +157,31 @@ document.addEventListener('keydown', (e) => {
         currentGame.player.move(0, 1, currentGame);
         moved = true;
     }
-    // Диагональные движения с NumPad (опционально)
+    // Диагональные движения с NumPad (один ход по диагонали)
     else if (key === 'numpad7') {
-        // Вверх-влево
-        currentGame.player.move(-1, 0, currentGame);
-        currentGame.player.move(0, -1, currentGame);
+        currentGame.player.move(-1, -1, currentGame);
         moved = true;
     }
     else if (key === 'numpad9') {
-        // Вверх-вправо
-        currentGame.player.move(-1, 0, currentGame);
-        currentGame.player.move(0, 1, currentGame);
+        currentGame.player.move(-1, 1, currentGame);
         moved = true;
     }
     else if (key === 'numpad1') {
-        // Вниз-влево
-        currentGame.player.move(1, 0, currentGame);
-        currentGame.player.move(0, -1, currentGame);
+        currentGame.player.move(1, -1, currentGame);
         moved = true;
     }
     else if (key === 'numpad3') {
-        // Вниз-вправо
-        currentGame.player.move(1, 0, currentGame);
-        currentGame.player.move(0, 1, currentGame);
+        currentGame.player.move(1, 1, currentGame);
         moved = true;
     }
     // Взмах мечом: Пробел
     else if (e.code === 'Space') {
         currentGame.player.swing(currentGame);
+        moved = true;
+    }
+    // Выстрел из лука: E / У
+    else if (key === 'e' || key === 'у') {
+        currentGame.player.shootBow(currentGame);
         moved = true;
     }
 

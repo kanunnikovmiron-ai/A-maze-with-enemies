@@ -68,6 +68,7 @@ class Renderer {
         if (game.inShopRoom) {
             this.drawMaze();
             this.drawShopRoom();
+            this.drawProjectiles();
             this.drawPlayer();
             this.drawSwingFlash();
             ctx.restore();
@@ -79,6 +80,7 @@ class Renderer {
         if (game.inSecretBossRoom) {
             this.drawMaze();
             this.drawSecretBossArena();
+            this.drawProjectiles();
             this.drawPlayer();
             this.drawSwingFlash();
             ctx.restore();
@@ -98,6 +100,7 @@ class Renderer {
         this.drawKeys();
         this.drawPickups();
         this.drawHazards();
+        this.drawProjectiles();
         this.drawEnemies();
         this.drawPlayer();
         this.drawSwingFlash();
@@ -724,6 +727,10 @@ class Renderer {
                 bg = 'rgba(80, 200, 255, 0.3)';
                 border = '#5ff';
                 icon = '🛡';
+            } else if (p.type === 'bow') {
+                bg = 'rgba(255, 170, 0, 0.3)';
+                border = '#fa0';
+                icon = '🏹';
             } else {
                 continue;
             }
@@ -781,6 +788,76 @@ class Renderer {
                     ctx.fillText('🔥', x + 6, y + 23);
                 }
             }
+        }
+    }
+
+    /**
+     * Отрисовка снарядов (стрел лука): полноценная текстура стрелы
+     * с металлическим наконечником, деревянным древком и оперением
+     */
+    drawProjectiles() {
+        const { game, ctx, cellSize } = this;
+        const noFog = game.inSecretBossRoom || game.inShopRoom || game.inSecretRoom;
+
+        for (const p of game.projectiles) {
+            if (!noFog && !this.isExplored(p.y, p.x)) continue;
+
+            const cx = p.x * cellSize + cellSize / 2;
+            const cy = p.y * cellSize + cellSize / 2;
+            const angle = Math.atan2(p.dy, p.dx);
+            const len = cellSize * 0.85;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+
+            // Свечение вокруг стрелы
+            ctx.shadowColor = '#fa0';
+            ctx.shadowBlur = 4;
+
+            // Оперение (V-образные перья сзади)
+            ctx.fillStyle = 'rgba(255, 200, 60, 0.55)';
+            ctx.beginPath();
+            ctx.moveTo(-len * 0.45, 0);
+            ctx.lineTo(-len * 0.25, -cellSize * 0.18);
+            ctx.lineTo(-len * 0.32, 0);
+            ctx.lineTo(-len * 0.25, cellSize * 0.18);
+            ctx.closePath();
+            ctx.fill();
+
+            // Деревянное древко
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#a0703c';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-len * 0.42, 0);
+            ctx.lineTo(len * 0.12, 0);
+            ctx.stroke();
+
+            // Серебристый наконечник (треугольник с градиентом)
+            const hx = len * 0.12;
+            const hh = cellSize * 0.18;
+            const hl = len * 0.38;
+            const grad = ctx.createLinearGradient(hx, -hh, hx + hl, 0);
+            grad.addColorStop(0, '#8a9ab0');
+            grad.addColorStop(0.5, '#d0d8e8');
+            grad.addColorStop(1, '#f0f4ff');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(hx + hl, 0);
+            ctx.lineTo(hx, -hh);
+            ctx.lineTo(hx + hl * 0.3, 0);
+            ctx.lineTo(hx, hh);
+            ctx.closePath();
+            ctx.fill();
+
+            // Обводка наконечника
+            ctx.strokeStyle = '#667';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+
+            ctx.restore();
         }
     }
 
@@ -962,8 +1039,9 @@ class Renderer {
 
         // Определяем цвет и свечение в зависимости от состояния врага
         this.setEnemyStyle(enemy);
+        const baseColor = ctx.fillStyle;
 
-        // Рисуем круг врага
+        // Внешнее кольцо — основной цвет состояния
         ctx.beginPath();
         ctx.arc(ex, ey, r, 0, Math.PI * 2);
         ctx.fill();
@@ -971,15 +1049,37 @@ class Renderer {
         // Сбрасываем свечение
         ctx.shadowBlur = 0;
 
-        // Обводка врага
+        // Среднее кольцо — затемнённый фон
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(ex, ey, r * 0.65, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Внутренний зрачок — яркий цвет состояния
+        ctx.fillStyle = baseColor;
+        ctx.beginPath();
+        ctx.arc(ex, ey, r * 0.38, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Чёрный центр
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(ex, ey, r * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Обводка внешнего кольца
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(ex, ey, r, 0, Math.PI * 2);
         ctx.stroke();
 
-        // ID врага в центре
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 9px Arial';
-        ctx.fillText(enemy.id, ex - 8, ey + 3);
+        // Обводка среднего кольца
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(ex, ey, r * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
     }
 
     /**
@@ -990,14 +1090,46 @@ class Renderer {
 
         // Определяем цвет и свечение
         this.setEnemyStyle(enemy);
+        const baseColor = ctx.fillStyle;
 
-        // Рисуем треугольник (направлен вверх)
+        // Вершины треугольника
+        const topY = ey - r;
+        const botY = ey + r * 0.7;
+        const leftX = ex - r;
+        const rightX = ex + r;
+
+        // Рисуем треугольник с горизонтальными шевронами
+        ctx.save();
         ctx.beginPath();
-        ctx.moveTo(ex, ey - r);              // Верхняя вершина
-        ctx.lineTo(ex - r, ey + r * 0.7);    // Левая нижняя вершина
-        ctx.lineTo(ex + r, ey + r * 0.7);    // Правая нижняя вершина
+        ctx.moveTo(ex, topY);
+        ctx.lineTo(leftX, botY);
+        ctx.lineTo(rightX, botY);
         ctx.closePath();
-        ctx.fill();
+        ctx.clip();
+
+        // Тёмный фон
+        ctx.fillStyle = '#111';
+        ctx.fillRect(leftX, topY, r * 2, botY - topY);
+
+        // 3 горизонтальные полосы (шевроны) — от яркой к тёмной
+        const h = botY - topY;
+        for (let i = 0; i < 3; i++) {
+            const barY = topY + h * 0.15 + h * 0.27 * i;
+            const barH = h * 0.18;
+            const alpha = 1 - i * 0.25;
+            ctx.fillStyle = baseColor;
+            ctx.globalAlpha = alpha;
+            ctx.fillRect(leftX - 2, barY, r * 2 + 4, barH);
+        }
+        ctx.globalAlpha = 1;
+
+        // Центральная вертикальная полоса (как «меч» стража)
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.25;
+        ctx.fillRect(ex - 1.5, topY, 3, h);
+        ctx.globalAlpha = 1;
+
+        ctx.restore();
 
         // Сбрасываем свечение
         ctx.shadowBlur = 0;
@@ -1005,12 +1137,12 @@ class Renderer {
         // Обводка треугольника
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(ex, topY);
+        ctx.lineTo(leftX, botY);
+        ctx.lineTo(rightX, botY);
+        ctx.closePath();
         ctx.stroke();
-
-        // ID стража внутри треугольника
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 8px Arial';
-        ctx.fillText(enemy.id, ex - 7, ey + 1);
     }
 
     /**
@@ -1019,6 +1151,7 @@ class Renderer {
     drawBossEnemy(enemy, ex, ey, r) {
         const { ctx, cellSize } = this;
         const stage2 = enemy.stage === 2;
+        const hr = r + 2; // радиус шестиугольника
 
         // Свечение при погоне (стадия 2 — оранжевое и сильнее)
         ctx.shadowColor = stage2 ? '#f50' : '#900';
@@ -1028,8 +1161,8 @@ class Renderer {
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 3) * i - Math.PI / 2;
-            const px = ex + (r + 2) * Math.cos(angle);
-            const py = ey + (r + 2) * Math.sin(angle);
+            const px = ex + hr * Math.cos(angle);
+            const py = ey + hr * Math.sin(angle);
             if (i === 0) ctx.moveTo(px, py);
             else ctx.lineTo(px, py);
         }
@@ -1039,8 +1172,57 @@ class Renderer {
         // Чёрное тело (поверженный — серый, стадия 2 — тёмно-красный)
         ctx.fillStyle = enemy.defeated ? '#444' : (stage2 ? '#3a0500' : '#0a0a0a');
         ctx.fill();
+
+        // Лучи от центра к вершинам шестиугольника
+        if (!enemy.defeated) {
+            const rayColor = stage2 ? '#f66' : '#a33';
+            ctx.save();
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i - Math.PI / 2;
+                const px = ex + hr * Math.cos(angle);
+                const py = ey + hr * Math.sin(angle);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.strokeStyle = rayColor;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = enemy.chase ? 0.7 : 0.35;
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i - Math.PI / 2;
+                const px = ex + hr * Math.cos(angle);
+                const py = ey + hr * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(ex, ey);
+                ctx.lineTo(px, py);
+                ctx.stroke();
+            }
+
+            // Центральный круг (ядро)
+            ctx.beginPath();
+            ctx.arc(ex, ey, hr * 0.2, 0, Math.PI * 2);
+            ctx.fillStyle = rayColor;
+            ctx.fill();
+
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        // Обводка шестиугольника
         ctx.strokeStyle = enemy.defeated ? '#888' : (stage2 ? '#f66' : '#a33');
         ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i - Math.PI / 2;
+            const px = ex + hr * Math.cos(angle);
+            const py = ey + hr * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
         ctx.stroke();
 
         // ID босса в центре
@@ -1052,13 +1234,13 @@ class Renderer {
         if (enemy.defeated) {
             ctx.fillStyle = '#f66';
             ctx.font = 'bold 10px Arial';
-            ctx.fillText('💀', ex - 7, ey - r - 6);
+            ctx.fillText('💀', ex - 7, ey - hr - 6);
         }
 
         // Полоска HP над шестиугольником (на всю ширину блока 2x2)
         const barWidth = cellSize * 2 - 8;
         const barX = ex - barWidth / 2;
-        const barY = Math.max(1, ey - r - 8);
+        const barY = Math.max(1, ey - hr - 8);
         ctx.fillStyle = '#111';
         ctx.fillRect(barX, barY, barWidth, 5);
         for (let i = 0; i < enemy.maxHp; i++) {
@@ -1105,41 +1287,137 @@ class Renderer {
     }
 
     /**
-     * Отрисовка игрока
+     * Отрисовка игрока — сапфировый кристалл (гексагон с огранкой)
      */
     drawPlayer() {
         const { game, ctx, cellSize } = this;
         const { x, y } = game.player;
-        const config = game.player.config;
-
-        // Временная неуязвимость (секретка) — золотые цвета, как у постоянной
         const invincible = game.player.isInvincible();
-        const bgColor = invincible ? '#4a3a1a' : config.bgColor;
-        const color = invincible ? '#fa0' : config.color;
+        const cx = x * cellSize + cellSize / 2;
+        const cy = y * cellSize + cellSize / 2;
+        const r = cellSize / 2 - 3;
 
-        // Фон игрока (меняется при неуязвимости)
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(x * cellSize + 2, y * cellSize + 2, cellSize - 4, cellSize - 4);
+        // Цветовая палитра
+        const base = invincible ? '#fa0' : '#37f';
+        const dark = invincible ? '#a60' : '#259';
+        const lite = invincible ? '#ffe' : '#aef';
+        const glow = invincible ? '#ff8' : '#6bf';
 
-        // Внутренний квадрат игрока
-        ctx.fillStyle = color;
-        ctx.fillRect(x * cellSize + 5, y * cellSize + 5, cellSize - 10, cellSize - 10);
+        // 6 вершин гексагона (0° — правая, далее по часовой)
+        const verts = [];
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i - Math.PI / 6;
+            verts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+        }
 
-        // Обводка игрока
+        // Свечение
+        ctx.save();
+        ctx.shadowColor = glow;
+        ctx.shadowBlur = 12;
+
+        // Внешний гексагон
+        ctx.beginPath();
+        ctx.moveTo(verts[0].x, verts[0].y);
+        for (let i = 1; i < 6; i++) ctx.lineTo(verts[i].x, verts[i].y);
+        ctx.closePath();
+        ctx.fillStyle = base;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Внутренние грани (6 линий от центра к вершинам)
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 6; i++) {
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(verts[i].x, verts[i].y);
+            ctx.stroke();
+        }
+
+        // Внутренний гексагон (грани огранки)
+        const ri = r * 0.55;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i - Math.PI / 6;
+            const px = cx + ri * Math.cos(a);
+            const py = cy + ri * Math.sin(a);
+            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = dark;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // Грани от внутреннего к внешнему (треугольники огранки)
+        for (let i = 0; i < 6; i++) {
+            const a1 = (Math.PI / 3) * i - Math.PI / 6;
+            const a2 = (Math.PI / 3) * ((i + 1) % 6) - Math.PI / 6;
+            ctx.beginPath();
+            ctx.moveTo(cx + ri * Math.cos(a1), cy + ri * Math.sin(a1));
+            ctx.lineTo(verts[i].x, verts[i].y);
+            ctx.lineTo(cx + ri * Math.cos(a2), cy + ri * Math.sin(a2));
+            ctx.closePath();
+            ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)';
+            ctx.fill();
+        }
+
+        // Индикатор facing — яркая грань
+        const f = game.player.facing;
+        let fi = -1;
+        if (f.dx === 1 && f.dy === 0) fi = 0;
+        else if (f.dx === 1 && f.dy === -1) fi = 1;
+        else if (f.dx === 0 && f.dy === -1) fi = 2;
+        else if (f.dx === -1 && f.dy === 0) fi = 3;
+        else if (f.dx === -1 && f.dy === 1) fi = 4;
+        else if (f.dx === 0 && f.dy === 1) fi = 5;
+        else if (f.dx === 1 && f.dy === 1) fi = 0;
+        else if (f.dx === -1 && f.dy === -1) fi = 3;
+
+        if (fi >= 0) {
+            const a1 = (Math.PI / 3) * fi - Math.PI / 6;
+            const a2 = (Math.PI / 3) * ((fi + 1) % 6) - Math.PI / 6;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(verts[fi].x, verts[fi].y);
+            ctx.lineTo(verts[(fi + 1) % 6].x, verts[(fi + 1) % 6].y);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.fill();
+        }
+
+        // Центральный блик
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.15, 0, Math.PI * 2);
+        ctx.fillStyle = lite;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Обводка гексагона
+        ctx.beginPath();
+        ctx.moveTo(verts[0].x, verts[0].y);
+        for (let i = 1; i < 6; i++) ctx.lineTo(verts[i].x, verts[i].y);
+        ctx.closePath();
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x * cellSize + 2, y * cellSize + 2, cellSize - 4, cellSize - 4);
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
 
-        // Символ игрока
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText(config.symbol, x * cellSize + 8, y * cellSize + 21);
+        ctx.restore();
 
-        // Иконка меча, если он есть
+        // Иконка меча
         if (game.player.hasSword) {
             ctx.fillStyle = '#ffd';
             ctx.font = 'bold 9px Arial';
             ctx.fillText('⚔', x * cellSize + cellSize - 10, y * cellSize + 13);
+        }
+        // Иконка лука
+        if (game.player.hasBow) {
+            ctx.fillStyle = '#fa0';
+            ctx.font = 'bold 9px Arial';
+            ctx.fillText('🏹', x * cellSize + cellSize - 10, y * cellSize + 24);
         }
     }
 
@@ -1221,7 +1499,7 @@ class Renderer {
                 const hp = this.game.player.hp;
                 const maxHp = this.game.player.maxHp;
                 const hearts = '❤'.repeat(hp) + '🖤'.repeat(Math.max(0, maxHp - hp));
-                hpDisplay.textContent = `❤ Здоровье: ${hearts} (${hp}/${maxHp})`;
+                hpDisplay.textContent = t('hud_health', hearts, hp, maxHp);
             } else {
                 hpDisplay.style.display = 'none';
             }
@@ -1233,7 +1511,7 @@ class Renderer {
         // Обновляем кошелёк (монеты из магазина)
         const walletEl = document.getElementById('walletDisplay');
         if (walletEl && typeof getWallet === 'function') {
-            walletEl.textContent = `🪙 ${getWallet()}`;
+            walletEl.textContent = t('hud_coins', getWallet());
         }
 
         // Обновляем номер уровня
@@ -1242,19 +1520,19 @@ class Renderer {
         // Обновляем заголовок игры
         const level = this.game.level;
         titleElement.textContent = this.game.isPreview
-            ? `🏰 ${level.name} (превью)`
-            : `🏰 ${level.name} (${this.game.levelIndex + 1}/${getTotalLevels()})`;
+            ? t('hud_level_preview', getLevelName(level, this.game.levelIndex))
+            : t('hud_level', getLevelName(level, this.game.levelIndex), this.game.levelIndex + 1, getTotalLevels());
 
         // Устанавливаем CSS-класс для стилизации сообщения
-        if (this.game.message.includes('ПОБЕДА')) {
+        if (this.game.message.includes('ПОБЕДА') || this.game.message.includes('VICTORY')) {
             msgElement.className = 'info win';
-        } else if (this.game.message.includes('ПОРАЖЕНИЕ')) {
+        } else if (this.game.message.includes('ПОРАЖЕНИЕ') || this.game.message.includes('DEFEAT')) {
             msgElement.className = 'info lose';
         } else if (this.game.message.includes('🔒')) {
             msgElement.className = 'info locked';
         } else if (this.game.message.includes('🔑') && !this.game.message.includes('🔓')) {
             msgElement.className = 'info warn';
-        } else if (this.game.message.includes('🔓') || this.game.message.includes('открыт')) {
+        } else if (this.game.message.includes('🔓') || this.game.message.includes('открыт') || this.game.message.includes('unlocked') || this.game.message.includes('Open')) {
             msgElement.className = 'info win';
         } else {
             msgElement.className = 'info';
@@ -1267,19 +1545,19 @@ class Renderer {
             this.game.stopBossMusic();
             this.game.stopShopMusic();
             this.game.stopSecretBossMusic();
-            const win = this.game.message.includes('ПОБЕДА');
-            document.getElementById('end-title').textContent = win ? '🏆 ПОБЕДА!' : '💀 ПОРАЖЕНИЕ!';
+            const win = this.game.message.includes('ПОБЕДА') || this.game.message.includes('VICTORY');
+            document.getElementById('end-title').textContent = win ? t('end_victory') : t('end_defeat');
             const coinsNote = this.game.isPreview
                 ? ''
-                : ` (+${this.game.coinsEarned} 🪙, баланс: ${typeof getWallet === 'function' ? getWallet() : 0} 🪙)`;
+                : t('end_coins_note', this.game.coinsEarned, typeof getWallet === 'function' ? getWallet() : 0);
             document.getElementById('end-subtitle').textContent = win
-                ? (this.game.isPreview ? 'Превью уровня завершено!'
+                ? (this.game.isPreview ? t('end_preview_done')
                     : (this.game.levelIndex === getTotalLevels() - 1
-                        ? `Все уровни пройдены!${coinsNote}`
-                        : `Отличная работа! Следующий уровень ждёт.${coinsNote}`))
+                        ? t('end_all_done') + coinsNote
+                        : t('end_next_msg') + coinsNote))
                 : this.game.message;
             document.getElementById('next-level-btn').style.display =
-                (win && !this.game.isPreview && this.game.levelIndex < getTotalLevels() - 1) ? 'block' : 'none';
+                (win && !this.game.isPreview && this.game.levelIndex > 0 && this.game.levelIndex < getTotalLevels() - 1) ? 'block' : 'none';
             endScreen.classList.remove('hidden');
         } else {
             endScreen.classList.add('hidden');
