@@ -1650,7 +1650,7 @@ class Renderer {
                 });
             } else {
                 endScreen.querySelectorAll('button').forEach(btn => {
-                    btn.style.display = '';
+                    if (btn.id !== 'next-level-btn') btn.style.display = '';
                 });
             }
         } else {
