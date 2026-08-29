@@ -233,17 +233,21 @@ class Renderer {
                         ctx.strokeRect(x * cellSize + 5, y * cellSize + 5, cellSize - 10, cellSize - 10);
                         ctx.fillStyle = '#7d5';
                         ctx.font = `${cellSize - 12}px sans-serif`;
+                        const prevAlign = ctx.textAlign;
+                        const prevBase = ctx.textBaseline;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText('🛒', x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
+                        ctx.textAlign = prevAlign;
+                        ctx.textBaseline = prevBase;
                     }
 
                     // Розовая трещина (арена секретного босса) — только в основном лабиринте
                     if (!game.inSecretBossRoom && game.secretBoss && !game.secretBoss.defeated &&
                         y === game.secretBoss.entrance.y && x === game.secretBoss.entrance.x) {
-                        ctx.fillStyle = 'rgba(255, 80, 180, 0.20)';
-                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-                        ctx.strokeStyle = 'rgba(255, 80, 180, 0.9)';
+    ctx.fillStyle = 'rgba(142, 68, 173, 0.20)';
+    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+    ctx.strokeStyle = 'rgba(142, 68, 173, 0.9)';
                         ctx.lineWidth = 2;
                         ctx.beginPath();
                         ctx.moveTo(x * cellSize + 6, y * cellSize + 24);
@@ -450,12 +454,12 @@ class Renderer {
 
         // Портал-выход через клетку входа
         const { x: px, y: py } = sb.entryPos;
-        ctx.strokeStyle = 'rgba(255, 80, 180, 0.9)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.strokeRect(px * cellSize + 4, py * cellSize + 4, cellSize - 8, cellSize - 8);
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#f9a';
+    ctx.strokeStyle = 'rgba(142, 68, 173, 0.9)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(px * cellSize + 4, py * cellSize + 4, cellSize - 8, cellSize - 8);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#9b59b6';
         ctx.font = 'bold 10px Arial';
         ctx.fillText('ВЫХОД', px * cellSize + 4, py * cellSize + 19);
 
@@ -486,38 +490,79 @@ class Renderer {
             return;
         }
 
-        const cx0 = cx;
-        const cy0 = cy - 3;
-        const s = cellSize * 0.42;
-        const glow = ctx.createRadialGradient(cx, cy, 1, cx, cy, cellSize * 0.75);
-        glow.addColorStop(0, 'rgba(255, 60, 150, 0.7)');
-        glow.addColorStop(1, 'rgba(255, 60, 150, 0)');
+        const r = cellSize * 0.35;
+
+        // Свечение
+        const glow = ctx.createRadialGradient(cx, cy, 1, cx, cy, cellSize * 0.8);
+        glow.addColorStop(0, 'rgba(142, 68, 173, 0.7)');
+        glow.addColorStop(1, 'rgba(142, 68, 173, 0)');
         ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(cx, cy, cellSize * 0.75, 0, Math.PI * 2);
+        ctx.arc(cx, cy, cellSize * 0.8, 0, Math.PI * 2);
         ctx.fill();
 
-        // Сердце (две окружности + треугольник)
-        ctx.fillStyle = '#ff4d8d';
+        // Шипы (6 треугольников на вершинах гексагона)
+        ctx.fillStyle = '#c39bd3';
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i - Math.PI / 6;
+            const tipR = r * 1.7;
+            const baseR = r * 0.85;
+            const aL = a - 0.25;
+            const aR = a + 0.25;
+            ctx.beginPath();
+            ctx.moveTo(cx + Math.cos(a) * tipR, cy + Math.sin(a) * tipR);
+            ctx.lineTo(cx + Math.cos(aL) * baseR, cy + Math.sin(aL) * baseR);
+            ctx.lineTo(cx + Math.cos(aR) * baseR, cy + Math.sin(aR) * baseR);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Гексагон (основное тело)
+        ctx.fillStyle = '#8e44ad';
         ctx.beginPath();
-        ctx.arc(cx0 - s * 0.45, cy0 - s * 0.2, s * 0.5, 0, Math.PI * 2);
-        ctx.arc(cx0 + s * 0.45, cy0 - s * 0.2, s * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(cx0 - s, cy0 + s * 0.1);
-        ctx.quadraticCurveTo(cx0 - s * 0.5, cy0 + s * 1.1, cx0, cy0 + s * 1.3);
-        ctx.quadraticCurveTo(cx0 + s * 0.5, cy0 + s * 1.1, cx0 + s, cy0 + s * 0.1);
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i - Math.PI / 6;
+            const px = cx + r * Math.cos(a);
+            const py = cy + r * Math.sin(a);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
         ctx.closePath();
         ctx.fill();
 
-        // HP-бар под сердцем
+        // Контур гексагона
+        ctx.strokeStyle = '#6c3483';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i - Math.PI / 6;
+            const px = cx + r * Math.cos(a);
+            const py = cy + r * Math.sin(a);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+
+        // Внутренний знак (крест)
+        ctx.strokeStyle = '#d2b4de';
+        ctx.lineWidth = 2;
+        const ir = r * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(cx - ir, cy);
+        ctx.lineTo(cx + ir, cy);
+        ctx.moveTo(cx, cy - ir);
+        ctx.lineTo(cx, cy + ir);
+        ctx.stroke();
+
+        // HP-бар
         const bw = cellSize * 0.8;
         const bh = 4;
         const bx = cx - bw / 2;
         const by = cy + cellSize * 0.28;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fillRect(bx, by, bw, bh);
-        ctx.fillStyle = '#ff4d8d';
+        ctx.fillStyle = '#8e44ad';
         ctx.fillRect(bx, by, bw * (enemy.hp / enemy.maxHp), bh);
     }
 
@@ -762,8 +807,38 @@ class Renderer {
 
             if (h.phase === 'warn') {
                 if (h.bomb) {
+                    const remaining = h.warnUntil ? h.warnUntil - Date.now() : Infinity;
+                    const isRed = remaining <= 1000;
                     // Бомба секретного босса: спрайт с горящим фитилём
+                    h._isRed = isRed;
                     this.drawBombWarn(h, x, y);
+                    // Предупреждение ⚠ на полу вдоль лучей креста
+                    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                    const maze = game.maze;
+                    const rows = game.rows;
+                    const cols = game.cols;
+                    for (const [dy, dx] of dirs) {
+                        let step = 1;
+                        while (true) {
+                            const ny = h.y + dy * step;
+                            const nx = h.x + dx * step;
+                            if (ny < 0 || ny >= rows || nx < 0 || nx >= cols) break;
+                            if (maze[ny][nx] === 1) break;
+                            if (noFog || this.isExplored(ny, nx)) {
+                                const rx = nx * cellSize;
+                                const ry = ny * cellSize;
+                                ctx.fillStyle = isRed ? 'rgba(255, 40, 30, 0.45)' : 'rgba(255, 200, 0, 0.35)';
+                                ctx.fillRect(rx + 1, ry + 1, cellSize - 2, cellSize - 2);
+                                ctx.strokeStyle = isRed ? '#f33' : '#fa0';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(rx + 2, ry + 2, cellSize - 4, cellSize - 4);
+                                ctx.fillStyle = isRed ? '#f33' : '#fa0';
+                                ctx.font = 'bold 14px Arial';
+                                ctx.fillText('\u26A0', rx + 7, ry + 22);
+                            }
+                            step++;
+                        }
+                    }
                 } else {
                     // Предупреждение: жёлтая клетка с рамкой
                     ctx.fillStyle = 'rgba(255, 200, 0, 0.35)';
@@ -874,14 +949,17 @@ class Renderer {
         const cy = y + cellSize / 2;
         const t = performance.now();
         const pulse = 0.5 + 0.5 * Math.sin(t * 0.008);
+        const isRed = h._isRed;
 
-        // Жёлтая заливка-предупреждение (слабая, чтобы спрайт читался)
-        ctx.fillStyle = 'rgba(255, 200, 0, 0.18)';
+        // Заливка-предупреждение
+        ctx.fillStyle = isRed ? 'rgba(255, 40, 30, 0.3)' : 'rgba(255, 200, 0, 0.18)';
         ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
 
-        // Пульсирующее красное кольцо
-        ctx.strokeStyle = `rgba(255, 60, 40, ${0.45 + 0.35 * pulse})`;
-        ctx.lineWidth = 2;
+        // Пульсирующее кольцо (красное, при isRed — ярче)
+        ctx.strokeStyle = isRed
+            ? `rgba(255, 30, 20, ${0.7 + 0.3 * pulse})`
+            : `rgba(255, 60, 40, ${0.45 + 0.35 * pulse})`;
+        ctx.lineWidth = isRed ? 3 : 2;
         ctx.beginPath();
         ctx.arc(cx, cy, cellSize * (0.42 + 0.07 * pulse), 0, Math.PI * 2);
         ctx.stroke();
@@ -1431,51 +1509,45 @@ class Renderer {
         if (!flash) return;
         const px = flash.x * cellSize + cellSize / 2;
         const py = flash.y * cellSize + cellSize / 2;
-        // Направление взмаха (по умолчанию — вправо)
-        const dx = flash.dx || 1;
-        const dy = flash.dy || 0;
-        const angle = Math.atan2(dy, dx);
+        const radius = (flash.radius || 1) * cellSize;
 
         ctx.save();
         ctx.translate(px, py);
-        ctx.rotate(angle);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Свечение росчерка
+        // Свечение круга
         ctx.shadowColor = 'rgba(255, 60, 40, 0.9)';
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 14;
 
-        // Главная дуга серпа (радиус, размах, толщина)
-        const arcR = cellSize * 0.42;
-        const arcW = cellSize * 0.42;
-        const startA = -Math.PI * 0.55;
-        const endA = Math.PI * 0.55;
-
-        // Огненный градиент поперёк дуги
-        const grad = ctx.createLinearGradient(0, -arcR, 0, arcR);
-        grad.addColorStop(0, '#ffd27f');
-        grad.addColorStop(0.5, '#ff6a1f');
-        grad.addColorStop(1, '#c81e00');
+        // Внешний огненный круг
+        const ringR = radius * 0.7;
+        const ringW = cellSize * 0.28;
+        const grad = ctx.createRadialGradient(0, 0, ringR * 0.4, 0, 0, ringR + ringW);
+        grad.addColorStop(0, 'rgba(255, 210, 127, 0.0)');
+        grad.addColorStop(0.5, 'rgba(255, 106, 31, 0.85)');
+        grad.addColorStop(1, 'rgba(200, 30, 0, 0.0)');
         ctx.strokeStyle = grad;
-        ctx.lineWidth = arcW;
+        ctx.lineWidth = ringW;
         ctx.beginPath();
-        ctx.arc(0, 0, arcR, startA, endA);
+        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Горячее белое ядро росчерка
-        ctx.shadowBlur = 18;
-        ctx.strokeStyle = 'rgba(255, 250, 235, 0.95)';
-        ctx.lineWidth = cellSize * 0.12;
+        // Белое ядро кольца
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = 'rgba(255, 250, 235, 0.9)';
+        ctx.lineWidth = cellSize * 0.1;
         ctx.beginPath();
-        ctx.arc(0, 0, arcR, startA + 0.08, endA - 0.08);
+        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Искры у концов дуги
+        // Искры по кругу
         ctx.fillStyle = '#fff';
-        for (const a of [startA, endA]) {
+        for (let i = 0; i < 8; i++) {
+            const a = (Math.PI * 2 / 8) * i;
+            const sr = ringR + ringW * 0.4;
             ctx.beginPath();
-            ctx.arc(Math.cos(a) * (arcR + arcW * 0.35), Math.sin(a) * (arcR + arcW * 0.35), cellSize * 0.05, 0, Math.PI * 2);
+            ctx.arc(Math.cos(a) * sr, Math.sin(a) * sr, cellSize * 0.045, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -1491,18 +1563,13 @@ class Renderer {
         const levelDisplay = document.getElementById('levelNumDisplay');
         const titleElement = document.getElementById('game-title');
 
-        // Обновляем здоровье игрока (сердечки) — на уровне босса и на арене секретного босса
+        // Обновляем здоровье игрока (сердечки) — всегда
         const hpDisplay = document.getElementById('playerHpDisplay');
         if (hpDisplay) {
-            if (this.game.isBossLevel || this.game.inSecretBossRoom) {
-                hpDisplay.style.display = '';
-                const hp = this.game.player.hp;
-                const maxHp = this.game.player.maxHp;
-                const hearts = '❤'.repeat(hp) + '🖤'.repeat(Math.max(0, maxHp - hp));
-                hpDisplay.textContent = t('hud_health', hearts, hp, maxHp);
-            } else {
-                hpDisplay.style.display = 'none';
-            }
+            const hp = this.game.player.hp;
+            const maxHp = this.game.player.maxHp;
+            const hearts = '❤'.repeat(hp) + '🖤'.repeat(Math.max(0, maxHp - hp));
+            hpDisplay.textContent = t('hud_health', hearts, hp, maxHp);
         }
 
         // Обновляем сообщение (textContent — имя уровня не должно выполнять HTML)
@@ -1512,6 +1579,17 @@ class Renderer {
         const walletEl = document.getElementById('walletDisplay');
         if (walletEl && typeof getWallet === 'function') {
             walletEl.textContent = t('hud_coins', getWallet());
+        }
+
+        // Обновляем индикацию оружия
+        const equipEl = document.getElementById('playerEquipDisplay');
+        if (equipEl) {
+            const p = this.game.player;
+            const parts = [];
+            if (p.swordPlus) parts.push(t('hud_equip_sword_plus'));
+            else if (p.hasSword) parts.push(t('hud_equip_sword'));
+            if (p.hasBow) parts.push(t('hud_equip_bow'));
+            equipEl.textContent = parts.length > 0 ? parts.join(' + ') : '';
         }
 
         // Обновляем номер уровня
@@ -1554,11 +1632,23 @@ class Renderer {
                 ? (this.game.isPreview ? t('end_preview_done')
                     : (this.game.levelIndex === getTotalLevels() - 1
                         ? t('end_all_done') + coinsNote
-                        : t('end_next_msg') + coinsNote))
+                        : (this.game.levelIndex === getTotalLevels() - 2
+                            ? t('end_boss_warning') + coinsNote
+                            : t('end_next_msg') + coinsNote)))
                 : this.game.message;
             document.getElementById('next-level-btn').style.display =
                 (win && !this.game.isPreview && this.game.levelIndex > 0 && this.game.levelIndex < getTotalLevels() - 1) ? 'block' : 'none';
             endScreen.classList.remove('hidden');
+            // На обучении: при смерти — Заново + В меню, при победе — только В меню
+            if (this.game.level && this.game.level.tutorial) {
+                const win2 = this.game.message.includes('ПОБЕДА') || this.game.message.includes('VICTORY');
+                endScreen.querySelectorAll('button').forEach(btn => {
+                    const oc = btn.getAttribute('onclick') || '';
+                    const isRestart = oc.includes('restartLevel');
+                    const isMenu = oc.includes('backToMenuFromGame');
+                    btn.style.display = (isMenu || (!win2 && isRestart)) ? '' : 'none';
+                });
+            }
         } else {
             endScreen.classList.add('hidden');
         }

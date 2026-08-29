@@ -17,10 +17,12 @@ class Player {
         this.swordPlus = false;        // Улучшенный меч из магазина (урон боссу 2)
         this.hasBow = false;           // Лук из магазина/секретки (дальнее оружие)
         this.bowCooldown = 0;          // Кулдаун выстрела (0 = можно стрелять)
+        this.swingCooldown = 0;        // Кулдаун взмаха мечом (мс)
         this.facing = { dy: 0, dx: 0 }; // Направление последнего успешного хода (для взмаха)
         this.maxHp = bossLevel ? 3 : 1; // HP: на босс-уровне 3, на обычных — 1
         this.hp = this.maxHp;          // Текущее здоровье игрока
-        this.hurtThisTurn = false;     // Уже получил урон в этот ход (защита от двойного урона)
+        this.hurtUntil = 0;            // Timestamp до которого действует неуязвимость после урона
+        this.hurtThisTurn = false;     // Уже получил урон в этот ход (защита от двойного урона, совместимость с тестами)
     }
 
     /**
@@ -33,11 +35,18 @@ class Player {
     takeDamage(game, defeatMessage) {
         if (this.isInvincible()) return false;
         this.hp--;
+        this.hurtUntil = Date.now() + 500;
         this.hurtThisTurn = true;
         game.levelHits = (game.levelHits || 0) + 1;
         if (this.hp <= 0) {
             game.gameOver = true;
             game.message = defeatMessage;
+            if (typeof updateStat === 'function') {
+                updateStat('totalDeaths', 1);
+                if (game.settings && game.settings.difficulty === 'hard') {
+                    updateStat('hardcoreDeaths', 1);
+                }
+            }
             return true;
         }
         game.message = t('msg_hurt', this.hp, this.maxHp);
@@ -78,8 +87,9 @@ class Player {
         if (game.shopConfirmPending) return false;
 
         // Сбрасываем флаги отбрасывания врага и подбора ключа на этот ход
-        game.repelledThisTurn = false;
+        game.repelledUntil = 0;
         game.pickedKeyThisTurn = false;
+        this.hurtUntil = 0;
         this.hurtThisTurn = false;
         game.moves = (game.moves || 0) + 1;
         if (this.bowCooldown > 0) this.bowCooldown--;
@@ -158,7 +168,7 @@ class Player {
                     heart.homeX = cell.x;
                     heart.resetState(game.maze);
                     game.message = t('msg_heart_repelled');
-                    game.repelledThisTurn = true;
+                    game.repelledUntil = Date.now() + 200;
                 } else {
                     const defeatMessage = t('msg_defeat_heart');
                     if (this.takeDamage(game, defeatMessage)) {
@@ -170,7 +180,7 @@ class Player {
                     heart.homeY = cell.y;
                     heart.homeX = cell.x;
                     heart.resetState(game.maze);
-                    game.repelledThisTurn = true;
+                    game.repelledUntil = Date.now() + 200;
                 }
             }
 
@@ -180,17 +190,16 @@ class Player {
 
             // Огонь бомбы: -1 HP
             const fire = game.hazards.find(h => h.phase === 'fire' && h.y === ny && h.x === nx);
-            if (fire && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_bomb'))) {
+            if (fire && this.hurtUntil <= Date.now() && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_bomb'))) {
                 return true;
             }
 
-            // Двигаем сердце (оно кидает бомбы)
-            game.updateEnemies();
-            if (game.gameOver) return true;
+            // Тик опасностей (warn→fire) для секретного босса
+            game.tickWorld();
 
             // Огонь, вспыхнувший под игроком в этот ход
             const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
-            if (fireNow && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_bomb'))) {
+            if (fireNow && this.hurtUntil <= Date.now() && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_bomb'))) {
                 return true;
             }
             return true;
@@ -254,7 +263,7 @@ class Player {
                     enemyThere.resetState(game.maze);
                     game.message = t('msg_enemy_repelled');
                 }
-                game.repelledThisTurn = true;
+                game.repelledUntil = Date.now() + 200;
             } else {
                 // Первое касание: -1 HP и отброс врага, второе касание — поражение
                 const defeatMessage = enemyThere.type === 'boss'
@@ -277,7 +286,7 @@ class Player {
                     enemyThere.homeX = cell.x;
                     enemyThere.resetState(game.maze);
                 }
-                game.repelledThisTurn = true;
+                game.repelledUntil = Date.now() + 200;
             }
         }
 
@@ -290,17 +299,14 @@ class Player {
             game.pickedKeyThisTurn = true;
         }
 
-        // Проверяем финиш
-        if (ny === game.finish.y && nx === game.finish.x) {
-            if (game.isFinishLocked()) {
-                if (game.boss && !game.boss.defeated) {
-                    game.message = t('msg_defeat_boss_first');
-                } else if (game.keyConfig.enabled && !game.hasAllKeys()) {
-                    game.message = t('msg_need_both_keys', game.keysCollected, game.keys.length);
-                } else {
-                    game.message = t('msg_finish_blocked');
-                }
-                return false;
+        // Проверяем финиш — всегда проходим (как враги)
+        if (ny === game.finish.y && nx === game.finish.x && game.isFinishLocked()) {
+            if (game.boss && !game.boss.defeated) {
+                game.message = t('msg_defeat_boss_first');
+            } else if (game.keyConfig.enabled && !game.hasAllKeys()) {
+                game.message = t('msg_need_both_keys', game.keysCollected, game.keys.length);
+            } else {
+                game.message = t('msg_finish_blocked');
             }
         }
 
@@ -330,8 +336,8 @@ class Player {
         this.x = nx;
         this.facing = { dy, dx };
 
-        // Проверяем победу (сразу после хода, до хода врагов — чтобы враги не убили на финише)
-        if (!game.gameOver && this.y === game.finish.y && this.x === game.finish.x) {
+        // Проверяем победу (только если финиш открыт, иначе игрок просто стоит на клетке)
+        if (!game.gameOver && !game.isFinishLocked() && this.y === game.finish.y && this.x === game.finish.x) {
             game.gameOver = true;
             game.message = t('msg_victory');
             game.markLevelCompleted();
@@ -340,6 +346,9 @@ class Player {
             // Ачивки: завершение уровня
             if (typeof updateStat === 'function') {
                 updateStat('levelsCompleted', (getStats().levelsCompleted || 0) + 1);
+                if (game.settings && game.settings.difficulty === 'hard') {
+                    updateStat('levelsCompletedHard', (getStats().levelsCompletedHard || 0) + 1);
+                }
                 if (typeof checkLevelAchievements === 'function') {
                     checkLevelAchievements({
                         noDamage: !game.levelHits,
@@ -354,22 +363,22 @@ class Player {
 
         // Огонь босса: -1 HP (без щита), второе попадание — поражение
         const fire = game.hazards.find(h => h.phase === 'fire' && h.y === ny && h.x === nx);
-        if (fire && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_fire'))) {
+        if (fire && this.hurtUntil <= Date.now() && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_fire'))) {
             return true;
         }
 
-        // Двигаем всех врагов
-        game.updateEnemies();
+        // Тик опасностей (warn→fire, огонь догорает) — синхронно после хода
+        game.tickWorld();
 
         // Огонь, вспыхнувший под игроком в этот ход (warn -> fire во время тика опасных клеток)
         if (!game.gameOver) {
             const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
-            if (fireNow && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_fire'))) {
+            if (fireNow && this.hurtUntil <= Date.now() && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_fire'))) {
                 return true;
             }
         }
 
-        if (!game.gameOver && !game.repelledThisTurn && !game.pickedKeyThisTurn && !this.hurtThisTurn) {
+        if (!game.gameOver && game.repelledUntil <= Date.now() && !game.pickedKeyThisTurn && this.hurtUntil <= Date.now() && !this.hurtThisTurn) {
             // Обновляем статусное сообщение (не затираем сообщение об уроне)
             game.updateStatusMessage();
         }
@@ -385,19 +394,29 @@ class Player {
     takeSwingFireDamage(game) {
         if (game.gameOver) return false;
         const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
-        if (fireNow && !this.hurtThisTurn) {
+        if (fireNow && this.hurtUntil <= Date.now() && !this.hurtThisTurn) {
             return this.takeDamage(game, t('msg_defeat_fire'));
         }
         return false;
     }
 
     /**
-     * Взмах мечом в направлении facing: убивает обычного врага или бьёт босса
+     * Hex-расстояние между двумя клетками (axial coordinates → cube)
+     */
+    static hexDist(y1, x1, y2, x2) {
+        const q1 = x1, r1 = y1, s1 = -q1 - r1;
+        const q2 = x2, r2 = y2, s2 = -q2 - r2;
+        return Math.max(Math.abs(q1 - q2), Math.abs(r1 - r2), Math.abs(s1 - s2));
+    }
+
+    /**
+     * Взмах мечом: AoE-атака по всем врагам в радиусе 2 клеток
      * @param {Object} game - объект игры
      * @returns {Object|null} результат удара ({type, message}) или null
      */
     swing(game) {
         if (game.gameOver || game.inSecretRoom || game.shopConfirmPending) return null;
+        this.hurtUntil = 0;
         this.hurtThisTurn = false;
 
         if (!this.hasSword) {
@@ -405,62 +424,87 @@ class Player {
             return null;
         }
 
-        const ty = this.y + this.facing.dy;
-        const tx = this.x + this.facing.dx;
-        game.swingFlash = { y: ty, x: tx, dy: this.facing.dy, dx: this.facing.dx };
+        if (this.swingCooldown > Date.now()) return null;
 
-        // Босс: блок 2x2, перекрывающий клетку взмаха
+        this.swingCooldown = Date.now() + 800;
+        const SWING_RADIUS = 2;
+        game.swingFlash = { y: this.y, x: this.x, radius: SWING_RADIUS };
+
         const boss = game.boss;
-        if (boss && !boss.defeated && boss.blockCovers(boss.y, boss.x, ty, tx)) {
-            const res = boss.applySwordHit(this, game.maze, game.enemies, (ex) => game.getRandomPassable(ex), { y: ty, x: tx });
+        const bossHit = [];
+        let secretBossHit = null;
+        const regularEnemies = [];
+
+        for (const e of game.enemies) {
+            if (Player.hexDist(this.y, this.x, e.y, e.x) > SWING_RADIUS) continue;
+            if (e.type === 'boss') {
+                if (boss && !boss.defeated) bossHit.push(e);
+            } else if (e.type === 'secretBoss') {
+                if (!secretBossHit) secretBossHit = e;
+            } else {
+                regularEnemies.push(e);
+            }
+        }
+
+        if (bossHit.length === 0 && !secretBossHit && regularEnemies.length === 0) {
+            game.message = t('msg_swing_miss');
+            game.tickWorld();
+            this.takeSwingFireDamage(game);
+            return null;
+        }
+
+        let result = null;
+
+        // Секретный босс
+        if (secretBossHit) {
+            const res = secretBossHit.takeSwordHit(game);
             if (res) {
-                game.repelledThisTurn = true;
-                game.message = res.message;
-                if (res.type === 'bossDefeated') {
-                    game.message = res.message;
-                    const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { boss: 30 };
-                    game.grantCoins(R.boss);
-                    if (typeof updateStat === 'function') { updateStat('bossesDefeated', 1); unlockAchievement('boss_sword'); checkAchievements(); }
+                game.repelledUntil = Date.now() + 200;
+                result = res;
+            }
+        }
+
+        // Обычные враги
+        for (const e of regularEnemies) {
+            if (game.enemies.includes(e)) {
+                game.removeEnemy(e);
+                result = { type: 'enemyKilled', message: t('msg_enemy_sword_killed', e.id) };
+            }
+        }
+        if (regularEnemies.length > 0 && !result) {
+            result = { type: 'enemyKilled', message: t('msg_enemy_sword_killed', regularEnemies[0].id) };
+        }
+        if (regularEnemies.length > 0) {
+            game.message = result.message;
+        }
+
+        // Босс
+        if (bossHit.length > 0 && boss && !boss.defeated) {
+            const anyCellInRange = bossHit.length > 0;
+            if (anyCellInRange) {
+                const res = boss.applySwordHit(this, game.maze, game.enemies, (ex) => game.getRandomPassable(ex), { y: this.y, x: this.x });
+                if (res) {
+                    game.repelledUntil = Date.now() + 200;
+                    result = res;
+                    if (res.type === 'bossDefeated') {
+                        const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { boss: 30 };
+                        game.grantCoins(R.boss);
+                        if (typeof updateStat === 'function') { updateStat('bossesDefeated', 1); unlockAchievement('boss_sword'); checkAchievements(); }
+                    }
                 }
             }
-            game.updateEnemies();
-            this.takeSwingFireDamage(game);
-            return res;
         }
 
-        // Секретный босс — розовое сердце (1x1)
-        const secretBoss = game.enemies.find(e => e.type === 'secretBoss' && e.y === ty && e.x === tx);
-        if (secretBoss) {
-            const res = secretBoss.takeSwordHit(game);
-            if (res) {
-                game.repelledThisTurn = true;
-                game.message = res.message;
+        if (result) game.message = result.message;
+
+        game.tickWorld();
+        if (!game.gameOver) {
+            const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
+            if (fireNow && this.hurtUntil <= Date.now() && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_fire'))) {
+                return { type: 'playerDied', message: game.message };
             }
-            game.updateEnemies();
-            if (!game.gameOver) {
-                // Огонь бомбы, вспыхнувший под игроком в этот ход
-                const fireNow = game.hazards.find(h => h.phase === 'fire' && h.y === this.y && h.x === this.x);
-                if (fireNow && !this.hurtThisTurn && this.takeDamage(game, t('msg_defeat_bomb'))) {
-                    return { type: 'playerDied', message: game.message };
-                }
-            }
-            return res;
         }
-
-        // Обычный враг (сердце секретного босса обрабатывается выше)
-        const enemy = game.enemies.find(e => e.type !== 'boss' && e.type !== 'secretBoss' && e.y === ty && e.x === tx);
-        if (enemy) {
-            game.removeEnemy(enemy);
-            game.message = t('msg_enemy_sword_killed', enemy.id);
-            game.updateEnemies();
-            this.takeSwingFireDamage(game);
-            return { type: 'enemyKilled', message: game.message };
-        }
-
-        game.message = t('msg_swing_miss');
-        game.updateEnemies();
-        this.takeSwingFireDamage(game);
-        return null;
+        return result;
     }
 
     /**
@@ -470,6 +514,7 @@ class Player {
      */
     shootBow(game) {
         if (game.gameOver || game.inSecretRoom || game.shopConfirmPending) return null;
+        this.hurtUntil = 0;
         this.hurtThisTurn = false;
 
         if (!this.hasBow) {
@@ -494,10 +539,59 @@ class Player {
         // Снаряд: стартует с клетки перед игроком
         const startY = this.y + dy;
         const startX = this.x + dx;
-        game.projectiles.push({ y: startY, x: startX, dy, dx, type: 'arrow' });
+
+        // Проверка столкновения на клетке спауна (враг/босс сразу под лучом)
+        let spawnHit = false;
+        if (game.boss && !game.boss.defeated && game.boss.blockCovers(game.boss.y, game.boss.x, startY, startX)) {
+            game.boss.hp -= 1;
+            spawnHit = true;
+            if (game.boss.hp <= 0) {
+                game.boss.defeated = true;
+                game.boss.chase = false;
+                game.boss.searching = false;
+                game.boss.path = [];
+                game.boss.returnPath = [];
+                game.boss.wanderPath = [];
+                game.boss.pathGoal = null;
+                game.message = t('msg_boss_arrow_killed');
+                game.repelledUntil = Date.now() + 200;
+                const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { boss: 30 };
+                game.grantCoins(R.boss);
+                if (typeof updateStat === 'function') { updateStat('bossesDefeated', 1); unlockAchievement('boss_arrow'); checkAchievements(); }
+            } else if (game.boss.hp <= Math.floor(game.boss.maxHp / 2) && game.boss.stage === 1) {
+                game.boss.stage = 2;
+                game.message = t('msg_boss_enraged', game.boss.hp);
+            } else {
+                game.message = t('msg_boss_arrow_hit', game.boss.hp);
+            }
+        } else {
+            const secretBoss = game.enemies.find(e => e.type === 'secretBoss' && e.y === startY && e.x === startX);
+            if (secretBoss) {
+                const res = secretBoss.takeSwordHit(game);
+                spawnHit = true;
+                if (res) {
+                    game.message = res.message;
+                    game.repelledUntil = Date.now() + 200;
+                }
+            } else {
+                const enemy = game.enemies.find(e =>
+                    e.type !== 'boss' && e.type !== 'secretBoss' && e.y === startY && e.x === startX
+                );
+                if (enemy) {
+                    game.removeEnemy(enemy);
+                    spawnHit = true;
+                    game.message = t('msg_enemy_arrow_killed', enemy.id);
+                    if (typeof updateStat === 'function') { updateStat('arrowKills', 1); checkAchievements(); }
+                }
+            }
+        }
+
+        if (!spawnHit) {
+            game.projectiles.push({ y: startY, x: startX, dy, dx, type: 'arrow' });
+        }
         if (typeof updateStat === 'function') { updateStat('bowShots', 1); checkAchievements(); }
 
-        game.updateEnemies();
+        game.tickWorld();
         this.takeSwingFireDamage(game);
         return { type: 'shot', message: t('msg_arrow_shot') };
     }

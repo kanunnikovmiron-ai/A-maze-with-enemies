@@ -113,7 +113,7 @@ class Enemy {
         // Выполняем движение в зависимости от состояния
         if ((this.chase || this.searching) && this.path.length > 0) {
             // Движение по пути преследования/поиска
-            const next = this.path.shift();
+            const next = this.path[0];
             let canStep = this.canMoveTo(next.y, next.x, enemies, maze);
 
             // Замедление вплотную: если в начале хода враг стоял рядом с игроком,
@@ -128,13 +128,15 @@ class Enemy {
             }
 
             if (canStep) {
+                this.path.shift();
                 this.y = next.y;
                 this.x = next.x;
             }
         } else if (this.returning && this.returnPath && this.returnPath.length > 0) {
             // Движение по пути возврата
-            const next = this.returnPath.shift();
+            const next = this.returnPath[0];
             if (this.canMoveTo(next.y, next.x, enemies, maze)) {
+                this.returnPath.shift();
                 this.y = next.y;
                 this.x = next.x;
             }

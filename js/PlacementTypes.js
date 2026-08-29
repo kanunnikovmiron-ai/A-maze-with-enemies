@@ -83,12 +83,12 @@ const PLACEMENT_TYPES = {
     secretBoss: {
         label: 'pt_secretBoss',
         icon: '💗',
-        color: '#f4f'
-    },
-    secretBossArena: {
-        label: 'pt_secretBossArena',
-        icon: '💥',
-        color: '#f4f',
+    color: '#8e44ad'
+},
+secretBossArena: {
+    label: 'pt_secretBossArena',
+    icon: '💥',
+    color: '#8e44ad',
         single: true,
         wallOnly: true
     }

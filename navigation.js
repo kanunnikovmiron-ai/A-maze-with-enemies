@@ -280,7 +280,7 @@ function renderLevelButtons() {
             return `<div class="level-num locked" title="${t('level_locked_title')}">🔒</div>`;
         }
         return `
-        <div class="level-num${l.tutorial ? ' tutorial' : ''}" onclick="selectLevel(${i})" title="${escapeHtml(getLevelName(l, i))}">${l.tutorial ? '0' : i}</div>
+        <div class="level-num${l.tutorial ? ' tutorial' : ''}" onclick="selectLevel(${i})" title="${escapeHtml(getLevelName(l, i))}">${l.tutorial ? '1' : (i + 1)}</div>
     `;
     }).join('');
 

@@ -54,9 +54,9 @@ function initEditorUI() {
         canvas.addEventListener('touchend', () => { editorState.dragging = false; }, { passive: true });
     }
 
-    // Редактор редактирует единственный сохранённый уровень (или пустую сетку)
-    if (CUSTOM_LEVELS[0]) {
-        loadLevelIntoEditor(CUSTOM_LEVELS[0]);
+    // Редактор загружает последний сохранённый уровень (или пустую сетку)
+    if (CUSTOM_LEVELS.length > 0) {
+        loadLevelIntoEditor(CUSTOM_LEVELS[CUSTOM_LEVELS.length - 1]);
     } else {
         editorNew();
     }
@@ -286,9 +286,9 @@ function drawEditor() {
                 }
                 if (editorState.secretBossEntrance &&
                     editorState.secretBossEntrance.y === y && editorState.secretBossEntrance.x === x) {
-                    ctx.fillStyle = 'rgba(255, 80, 200, 0.45)';
-                    ctx.fillRect(x * cell, y * cell, cell, cell);
-                    ctx.strokeStyle = '#f4f';
+    ctx.fillStyle = 'rgba(142, 68, 173, 0.45)';
+    ctx.fillRect(x * cell, y * cell, cell, cell);
+    ctx.strokeStyle = '#8e44ad';
                     ctx.lineWidth = 2;
                     ctx.strokeRect(x * cell + 3, y * cell + 3, cell - 6, cell - 6);
                     ctx.fillStyle = '#fff';
@@ -382,8 +382,8 @@ function drawArenaPreview() {
     const cy = 7 * cell + cell / 2;
     const s = cell * 0.42;
     const glow = ctx.createRadialGradient(cx, cy, 1, cx, cy, cell * 0.8);
-    glow.addColorStop(0, 'rgba(255, 60, 150, 0.7)');
-    glow.addColorStop(1, 'rgba(255, 60, 150, 0)');
+        glow.addColorStop(0, 'rgba(142, 68, 173, 0.7)');
+        glow.addColorStop(1, 'rgba(142, 68, 173, 0)');
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(cx, cy, cell * 0.8, 0, Math.PI * 2);
@@ -391,7 +391,7 @@ function drawArenaPreview() {
 
     const cx0 = cx;
     const cy0 = cy - 3;
-    ctx.fillStyle = '#ff4d8d';
+        ctx.fillStyle = '#8e44ad';
     ctx.beginPath();
     ctx.arc(cx0 - s * 0.45, cy0 - s * 0.2, s * 0.5, 0, Math.PI * 2);
     ctx.arc(cx0 + s * 0.45, cy0 - s * 0.2, s * 0.5, 0, Math.PI * 2);
@@ -411,12 +411,12 @@ function drawArenaPreview() {
 
     const px = 1 * cell + cell / 2;
     const py = 1 * cell + cell / 2;
-    ctx.strokeStyle = 'rgba(255, 80, 180, 0.9)';
+    ctx.strokeStyle = 'rgba(142, 68, 173, 0.9)';
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 4]);
-    ctx.strokeRect(1 * cell + 4, 1 * cell + 4, cell - 8, cell - 8);
+    ctx.strokeRect(px - cell / 2 + 4, py - cell / 2 + 4, cell - 8, cell - 8);
     ctx.setLineDash([]);
-    ctx.fillStyle = '#f9a';
+    ctx.fillStyle = '#9b59b6';
     ctx.font = 'bold 10px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('ВЫХОД', px, py);
@@ -462,6 +462,16 @@ function editorNew() {
     if (nameEl) nameEl.value = t('editor_name_default');
     setEditorMessage('');
     drawEditor();
+}
+
+function editorClearAll() {
+    if (typeof CUSTOM_LEVELS !== 'undefined' && CUSTOM_LEVELS.length === 0) {
+        setEditorMessage(t('editor_no_custom'));
+        return;
+    }
+    clearCustomLevels();
+    editorNew();
+    setEditorMessage(t('editor_cleared'));
 }
 
 /**

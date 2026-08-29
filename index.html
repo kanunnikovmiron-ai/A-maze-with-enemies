@@ -69,7 +69,7 @@
             <p>🎯 <span style="color:#fa0;" data-i18n="tutorial_goal">Цель:</span></p>
             <p>🎮 <span style="color:#fa0;" data-i18n="tutorial_controls">Управление:</span></p>
             <p>🗺 <span style="color:#fa0;" data-i18n="tutorial_maps">12 карт:</span></p>
-            <p>0️⃣ <span style="color:#fa0;" data-i18n="tutorial_level0">Уровень «Обучение»:</span></p>
+            <p>1️⃣ <span style="color:#fa0;" data-i18n="tutorial_level0">Уровень «Обучение»:</span></p>
             <p>👀 <span style="color:#fa0;" data-i18n="tutorial_enemies">Враги:</span></p>
             <p>🔑 <span style="color:#fa0;" data-i18n="tutorial_keys">Ключи:</span></p>
             <p>🌫 <span style="color:#fa0;" data-i18n="tutorial_fog">Туман войны:</span></p>
@@ -135,8 +135,9 @@
                     <button onclick="editorExport()" data-i18n="editor_export">📋 Экспорт</button>
                     <button onclick="editorImport()" data-i18n="editor_import_btn">📥 Импорт</button>
                     <button id="editor-preview-arena" onclick="editorToggleArenaPreview()" data-i18n="editor_preview">💗 Превью арены</button>
-                    <button onclick="editorNew()" data-i18n="editor_new">🆕 Новый</button>
-                    <button onclick="backToMenu()" data-i18n="editor_menu">↩ В меню</button>
+            <button onclick="editorNew()" data-i18n="editor_new">🆕 Новый</button>
+            <button onclick="editorClearAll()" data-i18n="editor_clear_all">🗑 Удалить все</button>
+            <button onclick="backToMenu()" data-i18n="editor_menu">↩ В меню</button>
                 </div>
                 <div class="info" id="editor-message"></div>
                 <textarea id="editor-import" data-i18n-placeholder="editor_import_placeholder" placeholder="Сюда вставьте JSON карты для импорта"></textarea>
@@ -152,6 +153,7 @@
         <canvas id="game" width="450" height="450"></canvas>
         <div class="info" id="playerHpDisplay" style="font-size:14px; font-weight:bold;"></div>
         <div class="info" id="walletDisplay" style="font-size:14px;">🪙 0</div>
+        <div class="info" id="playerEquipDisplay" style="font-size:14px;"></div>
         <div class="legend" id="game-legend"></div>
         <div style="display:flex; gap:8px; margin-top:4px;">
             <button onclick="restartLevel()" data-i18n="game_restart">🔁 Заново</button>

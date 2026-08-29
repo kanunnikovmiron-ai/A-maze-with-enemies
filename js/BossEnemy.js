@@ -331,7 +331,7 @@ class BossEnemy extends Enemy {
 
         // Движение по пути преследования
         if ((this.chase || this.searching) && this.path && this.path.length > 0) {
-            const next = this.path.shift();
+            const next = this.path[0];
             if (!this.canPlace(next.y, next.x)) {
                 this.path = [];
             } else {
@@ -346,13 +346,15 @@ class BossEnemy extends Enemy {
                     this.adjacentPause = false;
                 }
                 if (move) {
+                    this.path.shift();
                     this.y = next.y;
                     this.x = next.x;
                 }
             }
         } else if (this.returning && this.returnPath && this.returnPath.length > 0) {
-            const next = this.returnPath.shift();
+            const next = this.returnPath[0];
             if (this.canPlace(next.y, next.x)) {
+                this.returnPath.shift();
                 this.y = next.y;
                 this.x = next.x;
             } else {
@@ -364,8 +366,9 @@ class BossEnemy extends Enemy {
                 this.homeX = this.x;
             }
         } else if (this.wanderPath && this.wanderPath.length > 0) {
-            const next = this.wanderPath.shift();
+            const next = this.wanderPath[0];
             if (this.canPlace(next.y, next.x)) {
+                this.wanderPath.shift();
                 this.y = next.y;
                 this.x = next.x;
             } else {

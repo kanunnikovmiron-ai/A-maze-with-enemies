@@ -13,7 +13,7 @@ const ACHIEVEMENTS = [
     { id: 'bow_master', icon: '\uD83C\uDFAF', title: 'Мастер лука', desc: 'Убить 10 врагов стрелой' },
     { id: 'first_boss', icon: '\uD83D\uDC09', title: 'Павший титан', desc: 'Повержен первый босс' },
     { id: 'all_bosses', icon: '\uD83D\uDC78', title: 'Бог убийц', desc: 'Повержены все 3 босса' },
-    { id: 'secret_killer', icon: '\uD83D\uDC97', title: 'Охотник за сердцем', desc: 'Повержен секретный босс' },
+    { id: 'secret_killer', icon: '💜', title: 'Охотник за гексагоном', desc: 'Повержен секретный босс' },
     { id: 'secret_hunter', icon: '\uD83D\uDDDD\uFE0F', title: 'Охотник за тайнами', desc: 'Найти секретную комнату' },
     { id: 'shopaholic', icon: '\uD83D\uDED2', title: 'Шопоголик', desc: 'Купить что-то в магазине' },
     { id: 'collector', icon: '\uD83D\uDCB0', title: 'Коллекционер', desc: 'Купить всё в магазине' },
@@ -29,7 +29,8 @@ const ACHIEVEMENTS = [
     { id: 'sword_plus', icon: '\uD83D\uDD25', title: 'Огненный меч', desc: 'Купить улучшенный меч' },
     { id: 'boss_sword', icon: '\u2694\uFE0F', title: 'Мечник', desc: 'Убить босса мечом' },
     { id: 'boss_arrow', icon: '\uD83C\uDFF9', title: 'Стрелок', desc: 'Убить босса стрелой' },
-    { id: 'full_hp', icon: '\uD83D\uDEE1\uFE0F', title: 'Танк', desc: 'Пройти уровень с полным HP' }
+    { id: 'full_hp', icon: '\uD83D\uDEE1\uFE0F', title: 'Танк', desc: 'Пройти уровень с полным HP' },
+    { id: 'hardcore', icon: '\uD83D\uDC80', title: 'Хардкор', desc: 'Пройти все 12 карт на сложной без смертей' }
 ];
 
 function getTranslatedAchievement(ach) {
@@ -87,6 +88,7 @@ function checkAchievements() {
     if ((s.coinsEver||0) >= 200) unlockAchievement('rich');
     if ((s.coinsEver||0) >= 500) unlockAchievement('mega_rich');
     if ((s.coinsEver||0) >= 1000) unlockAchievement('coin_1000');
+    if ((s.levelsCompletedHard||0) >= 12 && (s.hardcoreDeaths||0) === 0) unlockAchievement('hardcore');
 }
 function checkLevelAchievements(levelStats) {
     if (levelStats.noDamage) unlockAchievement('no_damage');

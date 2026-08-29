@@ -56,7 +56,7 @@ function resolveLevel(index) {
  * @param {Object} level - объект уровня (maze, start, finish, placements...)
  */
 function addCustomLevel(level) {
-    CUSTOM_LEVELS = [level];
+    CUSTOM_LEVELS.push(level);
     saveCustomLevels();
 }
 
@@ -66,6 +66,11 @@ function addCustomLevel(level) {
  */
 function removeCustomLevelAt(i) {
     CUSTOM_LEVELS.splice(i, 1);
+    saveCustomLevels();
+}
+
+function clearCustomLevels() {
+    CUSTOM_LEVELS = [];
     saveCustomLevels();
 }
 

@@ -26,6 +26,7 @@ const LEVELS = [
             { type: 'key', y: 2, x: 8 },
             { type: 'key', y: 6, x: 2 },
             { type: 'buffHp', y: 2, x: 12 },
+            { type: 'bow', y: 5, x: 7 },
             { type: 'enemy', y: 9, x: 2 },
             { type: 'enemy', y: 12, x: 10 }
         ]

@@ -105,8 +105,9 @@ class Game {
         // Состояние игры
         this.gameOver = false;
         this.gameRunning = true;
-        this.repelledThisTurn = false;
+        this.repelledUntil = 0;        // Timestamp до которого действует защита от двойного удара
         this.pickedKeyThisTurn = false;
+        this._lastTickWorldTime = 0;   // Защита от двойного tickWorld() в одном кадре
         this.coinsEarned = 0; // Монеты, заработанные за текущий уровень
         this.moves = 0;       // Количество ходов игрока
         this.levelHits = 0;   // Количество полученных ударов за уровень
@@ -118,8 +119,10 @@ class Game {
         // Секретный проход (5% шанс)
         this.tryCreateSecret();
 
-        // Комната магазина (дверь на каждом уровне)
-        this.buildShop();
+        // Комната магазина — НЕ на уровнях с секретной комнатой (кроме обучения)
+        if (!this.secret || this.level.tutorial === true) {
+            this.buildShop();
+        }
 
         // Дверь магазина всегда видна через туман
         if (this.shop && this.fogEnabled) {
@@ -136,6 +139,9 @@ class Game {
 
         // Арена секретного босса (розовая трещина, шанс ~15%)
         this.buildSecretBoss();
+
+        // Игровой цикл: враги двигаются независимо от игрока (запускается из initGame)
+        this._loopTimer = null;
 
         // Музыка: сердца на карте — музыка секретного босса, иначе музыка арены босса
         if (this.hasLiveSecretBoss()) {
@@ -154,8 +160,6 @@ class Game {
      */
     applyShopBonuses() {
         if (typeof getShopBonuses !== 'function') return;
-        // На учебном уровне магазинные бонусы не применяются (сохраняем обучение мечу)
-        if (this.level.tutorial === true) return;
         const bonus = getShopBonuses();
         if (bonus.sword) this.player.giveSword();
         if (bonus.hpBonus > 0) {
@@ -450,6 +454,18 @@ class Game {
     }
 
     /**
+     * Обновление состояния мира (опасности, снаряды) — вызывается после действий игрока
+     */
+    tickWorld() {
+        if (this.inSecretRoom || this.inShopRoom) return;
+        const now = Date.now();
+        if (now - this._lastTickWorldTime < 100) return; // защита от двойного тика
+        this._lastTickWorldTime = now;
+        this.tickHazards();
+        this.updateProjectiles();
+    }
+
+    /**
      * Обновление всех врагов
      */
     updateEnemies() {
@@ -463,12 +479,6 @@ class Game {
         );
         for (const e of burned) this.removeEnemy(e);
 
-        // Тикаем опасные клетки (предупреждения -> огонь, огонь тает)
-        this.tickHazards();
-
-        // Двигаем снаряды (стрелы лука)
-        this.updateProjectiles();
-
         for (const enemy of this.enemies) {
             const result = enemy.update(
                 this.player,
@@ -479,9 +489,8 @@ class Game {
             );
 
             if (result && result.type === 'caught') {
-                // Защита от двойного урона за ход: если игрок уже пострадал
-                // (от столкновения/огня при ходе), отбрасываем врага без урона
-                if (this.player.hurtThisTurn) {
+                // Защита от двойного урона: если игрок уже пострадал недавно, отбрасываем врага без урона
+                if (this.player.hurtUntil > Date.now() || this.player.hurtThisTurn) {
                     if (enemy.type === 'boss') {
                         const cell = enemy.getKnockbackCell(this.player, this.maze, this.enemies);
                         if (cell) {
@@ -497,7 +506,7 @@ class Game {
                             enemy.resetState(this.maze);
                         }
                     }
-                    this.repelledThisTurn = true;
+                    this.repelledUntil = Date.now() + 200;
                     break;
                 }
                 // Игрок пойман: -1 HP, второе попадание — поражение
@@ -517,14 +526,14 @@ class Game {
                     enemy.homeX = cell.x;
                     enemy.resetState(this.maze);
                 }
-                this.repelledThisTurn = true;
+                this.repelledUntil = Date.now() + 200;
                 break;
             } else if (result && result.type === 'repelled') {
                 this.message = result.message;
-                this.repelledThisTurn = true;
+                this.repelledUntil = Date.now() + 200;
             } else if (result && result.type === 'bossDefeated') {
                 this.message = result.message;
-                this.repelledThisTurn = true;
+                this.repelledUntil = Date.now() + 200;
                 const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { boss: 30 };
                 this.grantCoins(R.boss);
             }
@@ -538,6 +547,7 @@ class Game {
         for (let i = this.hazards.length - 1; i >= 0; i--) {
             const h = this.hazards[i];
             if (h.phase === 'warn') {
+                if (h.bomb && h.warnUntil && Date.now() < h.warnUntil) continue;
                 h.phase = 'fire';
                 h.ttl = 1;
                 // Взрыв бомбы плюсом: добавляем огонь по 4 ортогональным соседям
@@ -581,7 +591,7 @@ class Game {
                     this.boss.wanderPath = [];
                     this.boss.pathGoal = null;
                     this.message = t('msg_boss_arrow_killed');
-                    this.repelledThisTurn = true;
+                    this.repelledUntil = Date.now() + 200;
                     const R = (typeof COIN_REWARDS !== 'undefined') ? COIN_REWARDS : { boss: 30 };
                     this.grantCoins(R.boss);
                     if (typeof updateStat === 'function') { updateStat('bossesDefeated', 1); unlockAchievement('boss_arrow'); checkAchievements(); }
@@ -601,7 +611,7 @@ class Game {
                 this.projectiles.splice(i, 1);
                 if (res) {
                     this.message = res.message;
-                    this.repelledThisTurn = true;
+                    this.repelledUntil = Date.now() + 200;
                 }
                 continue;
             }
@@ -716,6 +726,9 @@ class Game {
         if (level.tutorial) {
             msg += t('start_tutorial_hint');
         }
+        if (this.levelIndex === getTotalLevels() - 2) {
+            msg += t('start_boss_warning');
+        }
         return msg;
     }
 
@@ -780,11 +793,12 @@ class Game {
                 if (ny < 0 || ny >= rows || nx < 0 || nx >= cols) continue;
                 if (this.maze[ny][nx] === 1) {
                     if (ny > 0 && ny < rows - 1 && nx > 0 && nx < cols - 1) {
-                        // Не совпадает с входом в секретную комнату
-                        const isSecretEntrance = this.secret && this.secret.entrance.y === ny && this.secret.entrance.x === nx;
-                        const isBossEntrance = this.level.secretBossEntrance &&
-                            this.level.secretBossEntrance.y === ny && this.level.secretBossEntrance.x === nx;
-                        if (!isSecretEntrance && !isBossEntrance) {
+                        // Исключаем клетки в радиусе 2 от уже поставленных входов
+                        const nearSecret = this.secret &&
+                            Math.abs(this.secret.entrance.y - ny) + Math.abs(this.secret.entrance.x - nx) <= 2;
+                        const nearBoss = this.level.secretBossEntrance &&
+                            Math.abs(this.level.secretBossEntrance.y - ny) + Math.abs(this.level.secretBossEntrance.x - nx) <= 2;
+                        if (!nearSecret && !nearBoss) {
                             wallCandidates.push({ y: ny, x: nx });
                         }
                     }
@@ -947,8 +961,11 @@ class Game {
                 if (ny < 0 || ny >= rows || nx < 0 || nx >= cols) continue;
                 if (this.maze[ny][nx] === 1) {
                     if (ny > 0 && ny < rows - 1 && nx > 0 && nx < cols - 1) {
-                        if (!(this.secret && this.secret.entrance.y === ny && this.secret.entrance.x === nx) &&
-                            !(this.shop && this.shop.entrance.y === ny && this.shop.entrance.x === nx)) {
+                        const nearSecret = this.secret &&
+                            Math.abs(this.secret.entrance.y - ny) + Math.abs(this.secret.entrance.x - nx) <= 2;
+                        const nearShop = this.shop &&
+                            Math.abs(this.shop.entrance.y - ny) + Math.abs(this.shop.entrance.x - nx) <= 2;
+                        if (!nearSecret && !nearShop) {
                             wallCandidates.push({ y: ny, x: nx });
                         }
                     }
@@ -1092,6 +1109,10 @@ class Game {
         const res = buyItem(itemId);
         if (res.ok) {
             this.message = t('msg_shop_bought', res.item.icon, getShopItemName(res.item.id), getWallet());
+            if (itemId === 'sword') this.player.giveSword();
+            else if (itemId === 'hpBonus') { this.player.maxHp++; this.player.hp = this.player.maxHp; }
+            else if (itemId === 'swordPlus') this.player.swordPlus = true;
+            else if (itemId === 'bow') this.player.giveBow();
             if (typeof updateStat === 'function') { updateStat('shopBuys', 1); if (itemId === 'swordPlus') unlockAchievement('sword_plus'); checkAchievements(); }
         } else {
             this.message = t('msg_shop_fail', res.reason);
@@ -1400,6 +1421,45 @@ class Game {
                 this.secretAudio.currentTime = 0;
             }
         } catch (e) { /* аудио не должно ломать игру */ }
+    }
+
+    /**
+     * Игровой цикл: враги двигаются автоматически по таймеру
+     */
+    startLoop() {
+        this.stopLoop();
+        const interval = this.settings.difficulty === 'easy' ? 1000
+            : this.settings.difficulty === 'hard' ? 600
+            : 800;
+        this._loopTimer = setInterval(() => {
+            if (this.gameOver || !this.gameRunning) {
+                this.stopLoop();
+                return;
+            }
+            this.tickWorld();
+            // Сброс hurtThisTurn если 500мс неуязвимости прошли,
+            // иначе игрок AFK бессмертен
+            if (this.player.hurtUntil > 0 && Date.now() >= this.player.hurtUntil) {
+                this.player.hurtThisTurn = false;
+                this.player.hurtUntil = 0;
+            }
+            // Синхронизация prev позиций игрока перед тиком врагов,
+            // чтобы adjacentPause видел актуальную позицию, а не устаревшую
+            this.player.prevY = this.player.y;
+            this.player.prevX = this.player.x;
+            this.updateEnemies();
+            if (this.renderer) this.renderer.draw();
+        }, interval);
+    }
+
+    /**
+     * Остановить игровой цикл
+     */
+    stopLoop() {
+        if (this._loopTimer) {
+            clearInterval(this._loopTimer);
+            this._loopTimer = null;
+        }
     }
 
     /**

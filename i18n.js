@@ -41,7 +41,7 @@ const I18N = {
         tutorial_title: '📖 Как играть',
         tutorial_goal: '🎯 Цель: дойти до финиша F.',
         tutorial_controls: '🎮 Управление: Ц/Ф/Ы/В или WASD, или Стрелки',
-        tutorial_maps: '🗺 12 карт: «0 · Обучение» для новичков + 11 сложных и проходимых!',
+        tutorial_maps: '🗺 12 карт: «1 · Обучение» для новичков + 11 сложных и проходимых!',
         tutorial_level0: '0️⃣ Уровень «Обучение»: соберите 🔑 ключи, найдите 🗝 трещину в стене, заберите ⚔ меч, победите 👾 врагов и дойдите до финиша.',
         tutorial_enemies: '👀 Враги: видят по прямой — бегут.',
         tutorial_keys: '🔑 Ключи: на среднем и сложном нужно собрать обе части, чтобы открыть финиш.',
@@ -84,6 +84,9 @@ const I18N = {
         editor_import_btn: '📥 Импорт',
         editor_preview: '💗 Превью арены',
         editor_new: '🆕 Новый',
+        editor_clear_all: '🗑 Удалить все',
+        editor_cleared: '✅ Все пользовательские уровни удалены',
+        editor_no_custom: 'ℹ Пользовательских уровней нет',
         editor_menu: '↩ В меню',
         editor_import_placeholder: 'Сюда вставьте JSON карты для импорта',
 
@@ -104,6 +107,7 @@ const I18N = {
         end_preview_done: 'Превью карты завершено!',
         end_all_done: 'Все карты пройдены!',
         end_next_msg: 'Отличная работа! Следующий уровень ждёт.',
+        end_boss_warning: '⚠ Следующий уровень — Арена босса! Не забудьте закупиться в магазине!',
         end_coins_note: ' (+{0} 🪙, баланс: {1} 🪙)',
 
         // === Game.js messages ===
@@ -127,6 +131,7 @@ const I18N = {
         start_fog: ' 🌫 Туман войны: исследуйте карту.',
         start_invincible: '🛡 Неуязвимость. ',
         start_tutorial_hint: ' 📖 Соберите 🔑 ключи, найдите 🗝 трещину в стене, возьмите ⚔ меч, победите врагов и дойдите до финиша.',
+        start_boss_warning: ' ⚠ Следующий уровень — Арена босса! Не забудьте закупиться в магазине!',
 
         // Arrow messages
         msg_boss_arrow_killed: '🏹 Босс повержен стрелой! Финиш открыт!',
@@ -138,6 +143,7 @@ const I18N = {
         msg_shop_enter: '🛒 Магазин! Подойдите к пьедесталу, чтобы купить.',
         msg_shop_exit: 'Выход из магазина.',
         msg_shop_bought: '✅ Куплено: {0} {1}! (баланс: {2} 🪙)',
+        msg_shop_next_level: 'Предмет появится на следующем уровне!',
         msg_shop_fail: '❌ {0}',
 
         shop_confirm_buy: 'Купить',
@@ -146,11 +152,11 @@ const I18N = {
         shop_confirm_coins: 'Ваш баланс: {0} 🪙',
 
         // Secret boss
-        msg_secret_boss_defeated_first: '💖 Секретный босс повержен! (+30 монет)',
-        msg_secret_boss_defeated: '💖 Секретный босс повержен!',
-        msg_secret_boss_repelled: '💖 Босс отброшен! Осталось HP: {0}',
-        msg_secret_boss_arena_enter: '💖 Секретный босс! Одолейте розовое сердце и получите 30 монет!',
-        msg_secret_boss_arena_defeated: '💖 Секретный босс уже повежен. Выход — через трещину.',
+        msg_secret_boss_defeated_first: '💜 Секретный босс повержен! (+30 монет)',
+        msg_secret_boss_defeated: '💜 Секретный босс повержен!',
+        msg_secret_boss_repelled: '💜 Босс отброшен! Осталось HP: {0}',
+        msg_secret_boss_arena_enter: '💜 Секретный босс! Одолейте фиолетовый гексагон и получите 30 монет!',
+        msg_secret_boss_arena_defeated: '💜 Секретный босс уже повержен. Выход — через трещину.',
         msg_secret_boss_arena_exit: 'Выход из арены секретного босса.',
 
         // Secret room
@@ -159,7 +165,7 @@ const I18N = {
         msg_secret_exit: 'Выход из секретной комнаты.',
 
         // === Player.js messages ===
-        msg_heart_repelled: '🛡 Сердце отброшено.',
+        msg_heart_repelled: '🛡 Гексагон отброшен.',
         msg_boss_repelled: '🛡 Босс отброшен.',
         msg_enemy_repelled: '🛡 Враг отброшен.',
         msg_key_found: '🔑 Часть ключа найдена ({0}/{1})!',
@@ -180,7 +186,7 @@ const I18N = {
         msg_arrow_shot: '🏹 Стрела выпущена!',
 
         // Damage messages
-        msg_defeat_heart: '💀 ПОРАЖЕНИЕ! Розовое сердце коснулось вас!',
+        msg_defeat_heart: '💀 ПОРАЖЕНИЕ! Фиолетовый гексагон коснулся вас!',
         msg_defeat_bomb: '💀 ПОРАЖЕНИЕ! Бомба взорвалась!',
         msg_defeat_boss_touch: '💀 ПОРАЖЕНИЕ! Босс 👹 поймал вас!',
         msg_defeat_enemy_touch: '💀 ПОРАЖЕНИЕ! Вы наткнулись на {0}!',
@@ -204,6 +210,9 @@ const I18N = {
         // === Renderer HUD ===
         hud_health: '❤ Здоровье: {0} ({1}/{2})',
         hud_coins: '🪙 {0}',
+        hud_equip_sword: '⚔ Меч',
+        hud_equip_sword_plus: '⚔⚔ Улучш. меч',
+        hud_equip_bow: '🏹 Лук',
         hud_level_preview: '🏰 {0} (превью)',
         hud_level: '🏰 {0} ({1}/{2})',
 
@@ -238,7 +247,7 @@ const I18N = {
         ach_first_boss_desc: 'Повержен первый босс',
         ach_all_bosses_title: 'Бог убийц',
         ach_all_bosses_desc: 'Повержены все 3 босса',
-        ach_secret_killer_title: 'Охотник за сердцем',
+        ach_secret_killer_title: 'Охотник за гексагоном',
         ach_secret_killer_desc: 'Повержен секретный босс',
         ach_secret_hunter_title: 'Охотник за тайнами',
         ach_secret_hunter_desc: 'Найти секретную комнату',
@@ -272,6 +281,8 @@ const I18N = {
         ach_boss_arrow_desc: 'Убить босса стрелой',
         ach_full_hp_title: 'Танк',
         ach_full_hp_desc: 'Пройти уровень с полным HP',
+        ach_hardcore_title: 'Хардкор',
+        ach_hardcore_desc: 'Пройти все 12 карт на сложной без смертей',
         ach_locked: '???',
 
         // === Levels ===
@@ -378,7 +389,7 @@ const I18N = {
         tutorial_title: '📖 How to play',
         tutorial_goal: '🎯 Goal: reach the finish F.',
         tutorial_controls: '🎮 Controls: WASD or Arrow keys',
-        tutorial_maps: '🗺 12 maps: "0 · Tutorial" for beginners + 11 challenging and completable!',
+        tutorial_maps: '🗺 12 maps: "1 · Tutorial" for beginners + 11 challenging and completable!',
         tutorial_level0: '0️⃣ Tutorial level: collect 🔑 keys, find 🗝 crack in the wall, grab ⚔ sword, defeat 👾 enemies and reach the finish.',
         tutorial_enemies: '👀 Enemies: see in straight line — chase.',
         tutorial_keys: '🔑 Keys: on medium and hard you need to collect both parts to unlock the finish.',
@@ -421,6 +432,9 @@ const I18N = {
         editor_import_btn: '📥 Import',
         editor_preview: '💗 Arena preview',
         editor_new: '🆕 New',
+        editor_clear_all: '🗑 Delete all',
+        editor_cleared: '✅ All custom levels deleted',
+        editor_no_custom: 'ℹ No custom levels',
         editor_menu: '↩ To menu',
         editor_import_placeholder: 'Paste map JSON here to import',
 
@@ -441,6 +455,7 @@ const I18N = {
         end_preview_done: 'Map preview complete!',
         end_all_done: 'All maps completed!',
         end_next_msg: 'Great job! Next level awaits.',
+        end_boss_warning: '⚠ Next level is the Boss Arena! Don\'t forget to visit the shop!',
         end_coins_note: ' (+{0} 🪙, balance: {1} 🪙)',
 
         // === Game.js messages ===
@@ -464,6 +479,7 @@ const I18N = {
         start_fog: ' 🌫 Fog of war: explore the map.',
         start_invincible: '🛡 Invincible. ',
         start_tutorial_hint: ' 📖 Collect 🔑 keys, find 🗝 crack in the wall, grab ⚔ sword, defeat enemies and reach the finish.',
+        start_boss_warning: ' ⚠ Next level is the Boss Arena! Don\'t forget to visit the shop!',
 
         // Arrow messages
         msg_boss_arrow_killed: '🏹 Boss defeated by arrow! Finish unlocked!',
@@ -475,6 +491,7 @@ const I18N = {
         msg_shop_enter: '🛒 Shop! Walk to a pedestal to buy.',
         msg_shop_exit: 'Exited shop.',
         msg_shop_bought: '✅ Bought: {0} {1}! (balance: {2} 🪙)',
+        msg_shop_next_level: 'Item will appear on the next level!',
         msg_shop_fail: '❌ {0}',
 
         shop_confirm_buy: 'Buy',
@@ -483,11 +500,11 @@ const I18N = {
         shop_confirm_coins: 'Your balance: {0} 🪙',
 
         // Secret boss
-        msg_secret_boss_defeated_first: '💖 Secret boss defeated! (+30 coins)',
-        msg_secret_boss_defeated: '💖 Secret boss defeated!',
-        msg_secret_boss_repelled: '💖 Boss knocked back! HP remaining: {0}',
-        msg_secret_boss_arena_enter: '💖 Secret boss! Defeat the pink heart and get 30 coins!',
-        msg_secret_boss_arena_defeated: '💖 Secret boss already defeated. Exit through the crack.',
+        msg_secret_boss_defeated_first: '💜 Secret boss defeated! (+30 coins)',
+        msg_secret_boss_defeated: '💜 Secret boss defeated!',
+        msg_secret_boss_repelled: '💜 Boss knocked back! HP remaining: {0}',
+        msg_secret_boss_arena_enter: '💜 Secret boss! Defeat the purple hexagon and get 30 coins!',
+        msg_secret_boss_arena_defeated: '💜 Secret boss already defeated. Exit through the crack.',
         msg_secret_boss_arena_exit: 'Exited secret boss arena.',
 
         // Secret room
@@ -496,7 +513,7 @@ const I18N = {
         msg_secret_exit: 'Exited secret room.',
 
         // === Player.js messages ===
-        msg_heart_repelled: '🛡 Heart knocked back.',
+        msg_heart_repelled: '🛡 Hexagon knocked back.',
         msg_boss_repelled: '🛡 Boss knocked back.',
         msg_enemy_repelled: '🛡 Enemy knocked back.',
         msg_key_found: '🔑 Key part found ({0}/{1})!',
@@ -517,7 +534,7 @@ const I18N = {
         msg_arrow_shot: '🏹 Arrow fired!',
 
         // Damage messages
-        msg_defeat_heart: '💀 DEFEAT! Pink heart touched you!',
+        msg_defeat_heart: '💀 DEFEAT! Purple hexagon touched you!',
         msg_defeat_bomb: '💀 DEFEAT! Bomb exploded!',
         msg_defeat_boss_touch: '💀 DEFEAT! Boss 👹 caught you!',
         msg_defeat_enemy_touch: '💀 DEFEAT! You ran into {0}!',
@@ -541,6 +558,9 @@ const I18N = {
         // === Renderer HUD ===
         hud_health: '❤ Health: {0} ({1}/{2})',
         hud_coins: '🪙 {0}',
+        hud_equip_sword: '⚔ Sword',
+        hud_equip_sword_plus: '⚔⚔ Sword+',
+        hud_equip_bow: '🏹 Bow',
         hud_level_preview: '🏰 {0} (preview)',
         hud_level: '🏰 {0} ({1}/{2})',
 
@@ -575,7 +595,7 @@ const I18N = {
         ach_first_boss_desc: 'Defeat the first boss',
         ach_all_bosses_title: 'God of Killers',
         ach_all_bosses_desc: 'Defeat all 3 bosses',
-        ach_secret_killer_title: 'Heart Hunter',
+        ach_secret_killer_title: 'Hexagon Hunter',
         ach_secret_killer_desc: 'Defeat the secret boss',
         ach_secret_hunter_title: 'Secret Hunter',
         ach_secret_hunter_desc: 'Find the secret room',
@@ -609,6 +629,8 @@ const I18N = {
         ach_boss_arrow_desc: 'Kill the boss with an arrow',
         ach_full_hp_title: 'Tank',
         ach_full_hp_desc: 'Complete a level with full HP',
+        ach_hardcore_title: 'Hardcore',
+        ach_hardcore_desc: 'Complete all 12 maps on hard without dying',
         ach_locked: '???',
 
         // === Levels ===

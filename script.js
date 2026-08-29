@@ -47,6 +47,7 @@ function stopLevelMusic() {
  */
 function initGame() {
     if (currentGame) {
+        currentGame.stopLoop();
         currentGame.stopSecretMusic();
         currentGame.stopBossMusic();
         currentGame.stopShopMusic();
@@ -55,7 +56,13 @@ function initGame() {
     stopMenuMusic();
     const settings = getSettings();
     currentGame = new Game(selectedLevel, settings);
+    currentGame.startLoop();
     currentGame.renderer.draw();
+    // На обучении — только кнопка «В меню»
+    const isTutorial = LEVELS[selectedLevel] && LEVELS[selectedLevel].tutorial;
+    document.querySelectorAll('#game-screen > div:last-child button').forEach(btn => {
+        btn.style.display = (isTutorial && !btn.getAttribute('onclick')?.includes('backToMenuFromGame')) ? 'none' : '';
+    });
 }
 
 /**
@@ -110,6 +117,7 @@ function stopGameMusic() {
  */
 function initPreviewLevel(level) {
     if (currentGame) {
+        currentGame.stopLoop();
         currentGame.stopSecretMusic();
         currentGame.stopBossMusic();
         currentGame.stopShopMusic();
@@ -118,6 +126,7 @@ function initPreviewLevel(level) {
     stopMenuMusic();
     if (typeof stopLevelMusic === 'function') stopLevelMusic();
     currentGame = new Game(-1, getSettings(), level);
+    currentGame.startLoop();
     currentGame.renderer.draw();
 }
 
