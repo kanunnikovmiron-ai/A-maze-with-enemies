@@ -1648,6 +1648,10 @@ class Renderer {
                     const isMenu = oc.includes('backToMenuFromGame');
                     btn.style.display = (isMenu || (!win2 && isRestart)) ? '' : 'none';
                 });
+            } else {
+                endScreen.querySelectorAll('button').forEach(btn => {
+                    btn.style.display = '';
+                });
             }
         } else {
             endScreen.classList.add('hidden');

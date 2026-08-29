@@ -1433,6 +1433,7 @@ class Game {
             : 800;
         this._loopTimer = setInterval(() => {
             if (this.gameOver || !this.gameRunning) {
+                if (this.renderer) this.renderer.draw();
                 this.stopLoop();
                 return;
             }
