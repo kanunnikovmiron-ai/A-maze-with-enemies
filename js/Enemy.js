@@ -350,5 +350,8 @@ class Enemy {
             this.gameConfig.rows,
             this.gameConfig.cols
         );
+        if (!this.returnPath || this.returnPath.length === 0) {
+            this.returning = false;
+        }
     }
 }
