@@ -110,6 +110,13 @@ class Enemy {
         // Обновляем состояние (видимость, поиск, возврат)
         this.handleState(player, maze, enemies, getRandomPassable);
 
+        // Если возвращаемся, но путь пуст — уже на месте
+        if (this.returning && (!this.returnPath || this.returnPath.length === 0)) {
+            this.returning = false;
+            this.homeY = this.y;
+            this.homeX = this.x;
+        }
+
         // Выполняем движение в зависимости от состояния
         if ((this.chase || this.searching) && this.path.length > 0) {
             // Движение по пути преследования/поиска

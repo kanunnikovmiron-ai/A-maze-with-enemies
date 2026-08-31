@@ -271,5 +271,10 @@ class PatrolEnemy extends Enemy {
             this.gameConfig.rows,
             this.gameConfig.cols
         );
+
+        // Уже на точке маршрута — путь пуст, выходим из режима возврата
+        if (!this.returnPath || this.returnPath.length === 0) {
+            this.returning = false;
+        }
     }
 }
